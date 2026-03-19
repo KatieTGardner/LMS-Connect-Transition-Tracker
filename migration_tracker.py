@@ -56,10 +56,14 @@ completed_list_items = "".join([f"<li>{d.replace('district:', '')}</li>" for d i
 pending_list_items = "".join([f"<li>{d.replace('district:', '')}</li>" for d in pending])
 
 # --- TIMEZONE FIX ---
-# GitHub servers use UTC. We subtract 7 hours to get Pacific Daylight Time (PDT).
-# This is a simple fix; for perfect accuracy during DST changes, you'd use a library, 
-# but this works great for a dashboard!
-pdt_now = datetime.datetime.now() - datetime.timedelta(hours=7)
+# Instead of manual math, we define the UTC offset for Pacific Time
+# PDT is UTC-7. We use the timezone offset directly.
+from datetime import timezone, timedelta
+
+utc_now = datetime.datetime.now(timezone.utc)
+pdt_offset = timedelta(hours=-7) 
+pdt_now = utc_now + pdt_offset
+
 display_time = pdt_now.strftime('%b %d, %Y at %I:%M %p')
 
 # 5. Generate Dashboard
