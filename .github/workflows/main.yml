@@ -1,0 +1,36 @@
+name: Update Migration Dashboard
+
+on:
+  schedule:
+    # This runs at the start of every hour, every day
+    - cron: '0 * * * *'
+  workflow_dispatch: # Keeps your "Run Now" button active!
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run migration script
+        # This passes your Secret Key into the script as the argument we set up!
+        run: python migration_tracker.py ${{ secrets.LD_API_KEY }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
