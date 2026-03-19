@@ -1,0 +1,85 @@
+
+<html>
+<head>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 50px; color: #1d1c1d; }
+        .header { text-align: center; margin-bottom: 50px; }
+        .container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; width: 320px; }
+        .card.disabled { opacity: 0.6; filter: grayscale(1); }
+        
+        .progress-container { background: #eee; border-radius: 10px; height: 15px; width: 100%; margin: 20px 0; overflow: hidden; }
+        .progress-bar { background: #4285F4; height: 100%; width: 3%; transition: width 1s; }
+        
+        .google { color: #4285F4; }
+        .canvas { color: #E13939; }
+        .schoology { color: #00AEEF; }
+        
+        .btn-details { background: #4285F4; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; }
+        
+        #details-section { display: none; background: white; padding: 40px; border-radius: 15px; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .columns { display: flex; gap: 40px; text-align: left; }
+        .column { flex: 1; }
+        h3 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        ul { list-style: none; padding: 0; font-family: monospace; font-size: 0.85em; max-height: 400px; overflow-y: auto; background: #fafafa; border-radius: 8px; padding: 10px; }
+        li { padding: 6px; border-bottom: 1px solid #eee; }
+        .done { color: #1e8e3e; }
+        .todo { color: #d93025; }
+
+        .timestamp { font-size: 0.75em; color: #999; margin-top: 40px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>LMS Connect Migration Dashboard</h1>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2 class="google">Google Classroom</h2>
+            <div class="progress-container"><div class="progress-bar"></div></div>
+            <div class="stats" style="font-size:1.8em; font-weight:bold;">3%</div>
+            <p><b>1</b> of 31 Districts Enabled</p>
+            <button class="btn-details" onclick="toggleDetails()">View District Lists</button>
+        </div>
+
+        <div class="card disabled">
+            <h2 class="canvas">Canvas</h2>
+            <div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div>
+            <div class="stats">0%</div>
+            <p>Coming Soon</p>
+        </div>
+
+        <div class="card disabled">
+            <h2 class="schoology">Schoology</h2>
+            <div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div>
+            <div class="stats">0%</div>
+            <p>Coming Soon</p>
+        </div>
+    </div>
+
+    <div id="details-section">
+        <div class="columns">
+            <div class="column">
+                <h3 class="done">✅ Transitioned (1)</h3>
+                <ul><li>5d55eebb47fec200016953ef</li></ul>
+            </div>
+            <div class="column">
+                <h3 class="todo">⏳ Pending (30)</h3>
+                <ul><li>5e715f93d5a83b00015b71d7</li><li>582b26e00fc76a0100000316</li><li>5c34b67d66215e00011274fa</li><li>570ccae0dbfe7d01000001a4</li><li>5b6b14cbd970c3000121c496</li><li>566eeec683ce280100000291</li><li>5f19d6896aa24a0001b2a93d</li><li>5ed675acb5be080001b9fbfb</li><li>5b2d6c79d7eb980001e444f8</li><li>5c995c2d1510850001375fed</li><li>55b8ed512dfe310100001376</li><li>588f83c7e191da00014dac7b</li><li>5786c4dc78ef4c0100000758</li><li>54d3e3a60d98d20100000003</li><li>55f0508f42e7e9010000323d</li><li>5f343090a5122c00012fd7ac</li><li>52a9ce583aa89c9f0b001459</li><li>53bec0ab27e09eea30000004</li><li>6329a4e06fc4a6f38e567a95</li><li>55d78fa9d5d0860100002325</li><li>5995c8cd835c390001d1c5c0</li><li>66a911dc937c9ba03035f871</li><li>59a5e029e5b3e100014769cf</li><li>583c88f495061200010fd094</li><li>55d622a13a34fd010000204a</li><li>5c773873247142000127960e</li><li>5e8ea92cf861970001c29c15</li><li>66b27a9a57cf48e2bf4d9020</li><li>5852a7fc54c28300012bfac0</li><li>6312537d628ffb9248fe334c</li></ul>
+            </div>
+        </div>
+        <center><button class="btn-details" style="background:#666; margin-top:20px;" onclick="toggleDetails()">Close Details</button></center>
+    </div>
+
+    <div class="timestamp">Last Auto-Update: 02:52 PM</div>
+
+    <script>
+        function toggleDetails() {
+            var el = document.getElementById("details-section");
+            el.style.display = (el.style.display === "none" || el.style.display === "") ? "block" : "none";
+            if(el.style.display === "block") el.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
