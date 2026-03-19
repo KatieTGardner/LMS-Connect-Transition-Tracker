@@ -4,14 +4,12 @@ import sys
 import os
 
 # --- CONFIGURATION ---
-# Step 1: Secure API Key from Argument
 if len(sys.argv) > 1:
     API_TOKEN = sys.argv[1]
 else:
     print("❌ Error: No API Token provided.")
     sys.exit(1)
 
-# Step 2: Portable Paths (Works on Mac and GitHub)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TARGETS_FILE = os.path.join(BASE_DIR, "targets.txt")
 OUTPUT_HTML = os.path.join(BASE_DIR, "index.html")
@@ -20,12 +18,12 @@ PROJECT_KEY = "default"
 FLAG_KEY = "lms-connect-fully-owned-setup"
 ENV_KEY = "production" 
 
-# 1. Fetch Data from LaunchDarkly
+# 1. Fetch Data
 url = f"https://app.launchdarkly.com/api/v2/flags/{PROJECT_KEY}/{FLAG_KEY}"
 headers = {"Authorization": API_TOKEN, "LD-API-Version": "beta"}
 data = requests.get(url, headers=headers).json()
 
-# 2. Extract Enabled IDs from LD
+# 2. Extract IDs
 env_data = data.get('environments', {}).get(ENV_KEY, {})
 enabled_ids = []
 for t in env_data.get('targets', []):
@@ -43,7 +41,6 @@ with open(TARGETS_FILE, "r") as f:
     for line in f:
         clean_id = line.strip().replace(" ", "")
         if clean_id:
-            # AUTO-PREFIX: If the ID doesn't start with 'district:', add it
             if not clean_id.startswith("district:"):
                 clean_id = f"district:{clean_id}"
             MASTER_LIST.append(clean_id)
@@ -54,11 +51,18 @@ pending = [d for d in MASTER_LIST if d not in enabled_ids]
 count, total = len(completed), len(MASTER_LIST)
 percent = int((count / total) * 100) if total > 0 else 0
 
-# 4. Prepare Lists for HTML (stripping "district:" for a cleaner display)
+# 4. Prepare Lists (Stripping "district:" for the UI)
 completed_list_items = "".join([f"<li>{d.replace('district:', '')}</li>" for d in completed])
 pending_list_items = "".join([f"<li>{d.replace('district:', '')}</li>" for d in pending])
 
-# 5. Generate Dashboard (Restored 3-Column Layout)
+# --- TIMEZONE FIX ---
+# GitHub servers use UTC. We subtract 7 hours to get Pacific Daylight Time (PDT).
+# This is a simple fix; for perfect accuracy during DST changes, you'd use a library, 
+# but this works great for a dashboard!
+pdt_now = datetime.datetime.now() - datetime.timedelta(hours=7)
+display_time = pdt_now.strftime('%b %d, %Y at %I:%M %p')
+
+# 5. Generate Dashboard
 html_content = f"""
 <html>
 <head>
@@ -68,73 +72,40 @@ html_content = f"""
         .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }}
         .card {{ background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; width: 320px; }}
         .card.disabled {{ opacity: 0.6; filter: grayscale(1); }}
-        
         .progress-container {{ background: #eee; border-radius: 10px; height: 15px; width: 100%; margin: 20px 0; overflow: hidden; }}
         .progress-bar {{ background: #4285F4; height: 100%; width: {percent}%; transition: width 1s; }}
-        
-        .google {{ color: #4285F4; }}
-        .canvas {{ color: #E13939; }}
-        .schoology {{ color: #00AEEF; }}
-        
         .btn-details {{ background: #4285F4; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; }}
-        
         #details-section {{ display: none; background: white; padding: 40px; border-radius: 15px; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
         .columns {{ display: flex; gap: 40px; text-align: left; }}
         .column {{ flex: 1; }}
-        h3 {{ border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }}
         ul {{ list-style: none; padding: 0; font-family: monospace; font-size: 0.85em; max-height: 400px; overflow-y: auto; background: #fafafa; border-radius: 8px; padding: 10px; }}
         li {{ padding: 6px; border-bottom: 1px solid #eee; }}
         .done {{ color: #1e8e3e; }}
         .todo {{ color: #d93025; }}
-
-        .timestamp {{ font-size: 0.75em; color: #999; margin-top: 40px; text-align: center; }}
+        .timestamp {{ font-size: 0.85em; color: #777; margin-top: 40px; text-align: center; font-weight: 500; }}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>LMS Connect Migration Dashboard</h1>
-    </div>
-
+    <div class="header"><h1>LMS Connect Migration Dashboard</h1></div>
     <div class="container">
         <div class="card">
-            <h2 class="google">Google Classroom</h2>
+            <h2 style="color:#4285F4">Google Classroom</h2>
             <div class="progress-container"><div class="progress-bar"></div></div>
             <div class="stats" style="font-size:1.8em; font-weight:bold;">{percent}%</div>
             <p><b>{count}</b> of {total} Districts Enabled</p>
             <button class="btn-details" onclick="toggleDetails()">View District Lists</button>
         </div>
-
-        <div class="card disabled">
-            <h2 class="canvas">Canvas</h2>
-            <div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div>
-            <div class="stats">0%</div>
-            <p>Coming Soon</p>
-        </div>
-
-        <div class="card disabled">
-            <h2 class="schoology">Schoology</h2>
-            <div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div>
-            <div class="stats">0%</div>
-            <p>Coming Soon</p>
-        </div>
+        <div class="card disabled"><h2>Canvas</h2><div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div><p>Coming Soon</p></div>
+        <div class="card disabled"><h2>Schoology</h2><div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div><p>Coming Soon</p></div>
     </div>
-
     <div id="details-section">
         <div class="columns">
-            <div class="column">
-                <h3 class="done">✅ Transitioned ({count})</h3>
-                <ul>{completed_list_items}</ul>
-            </div>
-            <div class="column">
-                <h3 class="todo">⏳ Pending ({len(pending)})</h3>
-                <ul>{pending_list_items}</ul>
-            </div>
+            <div class="column"><h3 class="done">✅ Transitioned ({count})</h3><ul>{completed_list_items}</ul></div>
+            <div class="column"><h3 class="todo">⏳ Pending ({len(pending)})</h3><ul>{pending_list_items}</ul></div>
         </div>
         <center><button class="btn-details" style="background:#666; margin-top:20px;" onclick="toggleDetails()">Close Details</button></center>
     </div>
-
-    <div class="timestamp">Last Auto-Update: {datetime.datetime.now().strftime('%I:%M %p')}</div>
-
+    <div class="timestamp">Last Auto-Update: {display_time} (PT)</div>
     <script>
         function toggleDetails() {{
             var el = document.getElementById("details-section");
@@ -148,5 +119,3 @@ html_content = f"""
 
 with open(OUTPUT_HTML, "w") as f:
     f.write(html_content)
-
-print(f"✅ Success! Dashboard updated at {OUTPUT_HTML}")
