@@ -1,10 +1,11 @@
 name: Update Migration Dashboard
-
 on:
   schedule:
-    # This runs at the start of every hour, every day
-    - cron: '0 * * * *'
-  workflow_dispatch: # Keeps your "Run Now" button active!
+    - cron: '0 * * * *'  # Runs every hour
+  workflow_dispatch:      # THIS LINE ALLOWS THE MANUAL RUN BUTTON TO WORK
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write
