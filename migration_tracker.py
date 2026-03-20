@@ -2,124 +2,152 @@ import requests
 import datetime
 import sys
 import os
+from datetime import timezone, timedelta
 
 # --- CONFIGURATION ---
 if len(sys.argv) > 1:
-    API_TOKEN = sys.argv[1]
+    API_TOKEN = sys.argv
 else:
     print("❌ Error: No API Token provided.")
     sys.exit(1)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TARGETS_FILE = os.path.join(BASE_DIR, "targets.txt")
-OUTPUT_HTML = os.path.join(BASE_DIR, "index.html")
-
 PROJECT_KEY = "default"
-FLAG_KEY = "lms-connect-fully-owned-setup"
-ENV_KEY = "production" 
+ENV_KEY = "production"
 
-# 1. Fetch Data
-url = f"https://app.launchdarkly.com/api/v2/flags/{PROJECT_KEY}/{FLAG_KEY}"
-headers = {"Authorization": API_TOKEN, "LD-API-Version": "beta"}
-data = requests.get(url, headers=headers).json()
+# Configuration for 3 LMS types, each with two source files
+LMS_CONFIGS = {
+    "google": {
+        "districts_file": "gc_targets.txt",
+        "apps_file": "gc_apps.txt",
+        "flag": "lms-connect-fully-owned-setup",
+        "color": "#4285F4",
+        "title": "Google Classroom"
+    },
+    "canvas": {
+        "districts_file": "canvas_targets.txt",
+        "apps_file": "canvas_apps.txt",
+        "flag": "lms-connect-canvas-migration", 
+        "color": "#E13939",
+        "title": "Canvas"
+    },
+    "schoology": {
+        "districts_file": "schoology_targets.txt",
+        "apps_file": "schoology_apps.txt",
+        "flag": "lms-connect-schoology-migration",
+        "color": "#00AEEF",
+        "title": "Schoology"
+    }
+}
 
-# 2. Extract IDs
-env_data = data.get('environments', {}).get(ENV_KEY, {})
-enabled_ids = []
-for t in env_data.get('targets', []):
-    if t.get('variation') == 0:
-        enabled_ids.extend(t.get('values', []))
-for rule in env_data.get('rules', []):
-    if rule.get('variation') == 0:
-        for clause in rule.get('clauses', []):
-            enabled_ids.extend(clause.get('values', []))
-enabled_ids = list(set([str(i).strip() for i in enabled_ids if i]))
+def get_ld_enabled_ids(flag_key):
+    url = f"https://app.launchdarkly.com/api/v2/flags/{PROJECT_KEY}/{flag_key}"
+    headers = {"Authorization": API_TOKEN, "LD-API-Version": "beta"}
+    try:
+        data = requests.get(url, headers=headers).json()
+        env_data = data.get('environments', {}).get(ENV_KEY, {})
+        enabled = []
+        for t in env_data.get('targets', []):
+            if t.get('variation') == 0: enabled.extend(t.get('values', []))
+        for rule in env_data.get('rules', []):
+            if rule.get('variation') == 0:
+                for c in rule.get('clauses', []): enabled.extend(c.get('values', []))
+        return list(set([str(i).strip() for i in enabled if i]))
+    except:
+        return []
 
-# 3. Read Master List & Auto-Prefix
-MASTER_LIST = []
-with open(TARGETS_FILE, "r") as f:
-    for line in f:
-        clean_id = line.strip().replace(" ", "")
-        if clean_id:
-            if not clean_id.startswith("district:"):
-                clean_id = f"district:{clean_id}"
-            MASTER_LIST.append(clean_id)
+def process_file(filename, prefix, enabled_ids):
+    path = os.path.join(BASE_DIR, filename)
+    master = []
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            for line in f:
+                val = line.strip().replace(" ", "")
+                if val:
+                    if not val.startswith(prefix): val = f"{prefix}{val}"
+                    master.append(val)
+    
+    comp = [i for i in master if i in enabled_ids]
+    pend = [i for i in master if i not in enabled_ids]
+    return {"all": master, "comp": comp, "pend": pend}
 
-completed = [d for d in MASTER_LIST if d in enabled_ids]
-pending = [d for d in MASTER_LIST if d not in enabled_ids]
+# Process all data
+results = {}
+for key, cfg in LMS_CONFIGS.items():
+    enabled = get_ld_enabled_ids(cfg['flag'])
+    
+    districts = process_file(cfg['districts_file'], "district:", enabled)
+    apps = process_file(cfg['apps_file'], "app:", enabled)
+    
+    total_targets = len(districts['all']) + len(apps['all'])
+    total_comp = len(districts['comp']) + len(apps['comp'])
+    
+    results[key] = {
+        "districts": districts,
+        "apps": apps,
+        "percent": int((total_comp / total_targets) * 100) if total_targets > 0 else 0,
+        "total": total_targets,
+        "count": total_comp
+    }
 
-count, total = len(completed), len(MASTER_LIST)
-percent = int((count / total) * 100) if total > 0 else 0
+# --- HTML GENERATION ---
+cards_html = ""
+details_html = ""
 
-# 4. Prepare Lists (Stripping "district:" for the UI)
-completed_list_items = "".join([f"<li>{d.replace('district:', '')}</li>" for d in completed])
-pending_list_items = "".join([f"<li>{d.replace('district:', '')}</li>" for d in pending])
+for key, cfg in LMS_CONFIGS.items():
+    res = results[key]
+    cards_html += f"""
+    <div class="card">
+        <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
+        <div class="progress-container"><div class="progress-bar" style="background:{cfg['color']}; width:{res['percent']}%"></div></div>
+        <div class="stats">{res['percent']}%</div>
+        <div style="font-size: 0.9em; margin-top: 10px;">
+            <div>🏢 Districts: <b>{len(res['districts']['comp'])}/{len(res['districts']['all'])}</b></div>
+            <div>📱 Apps: <b>{len(res['apps']['comp'])}/{len(res['apps']['all'])}</b></div>
+        </div>
+    </div>
+    """
+    
+    if res['total'] > 0:
+        def format_list(items): return "".join([f"<li>{i.split(':')[-1]}</li>" for i in sorted(items)])
+        
+        details_html += f"""
+        <div class="column">
+            <h3 style="border-bottom: 3px solid {cfg['color']}">{cfg['title']}</h3>
+            <p><b>Districts Pending:</b></p><ul>{format_list(res['districts']['pend'])}</ul>
+            <p><b>Apps Pending:</b></p><ul>{format_list(res['apps']['pend'])}</ul>
+        </div>
+        """
 
-# --- TIMEZONE FIX ---
-# Instead of manual math, we define the UTC offset for Pacific Time
-# PDT is UTC-7. We use the timezone offset directly.
-from datetime import timezone, timedelta
-
-utc_now = datetime.datetime.now(timezone.utc)
-pdt_offset = timedelta(hours=-7) 
-pdt_now = utc_now + pdt_offset
-
+pdt_now = datetime.datetime.now(timezone.utc) - timedelta(hours=7)
 display_time = pdt_now.strftime('%b %d, %Y at %I:%M %p')
 
-# 5. Generate Dashboard
-html_content = f"""
+final_html = f"""
 <html>
 <head>
     <style>
-        body {{ font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 50px; color: #1d1c1d; }}
-        .header {{ text-align: center; margin-bottom: 50px; }}
-        .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }}
-        .card {{ background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; width: 320px; }}
-        .card.disabled {{ opacity: 0.6; filter: grayscale(1); }}
-        .progress-container {{ background: #eee; border-radius: 10px; height: 15px; width: 100%; margin: 20px 0; overflow: hidden; }}
-        .progress-bar {{ background: #4285F4; height: 100%; width: {percent}%; transition: width 1s; }}
-        .btn-details {{ background: #4285F4; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; }}
-        #details-section {{ display: none; background: white; padding: 40px; border-radius: 15px; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
-        .columns {{ display: flex; gap: 40px; text-align: left; }}
+        body {{ font-family: -apple-system, sans-serif; background: #f4f7f9; padding: 40px; }}
+        .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }}
+        .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 280px; text-align: center; }}
+        .progress-container {{ background: #eee; border-radius: 10px; height: 12px; margin: 15px 0; overflow: hidden; }}
+        .progress-bar {{ height: 100%; transition: width 1s; }}
+        .stats {{ font-size: 2em; font-weight: bold; }}
+        #details {{ display: none; background: white; padding: 30px; border-radius: 12px; margin-top: 30px; }}
+        .columns {{ display: flex; gap: 20px; }}
         .column {{ flex: 1; }}
-        ul {{ list-style: none; padding: 0; font-family: monospace; font-size: 0.85em; max-height: 400px; overflow-y: auto; background: #fafafa; border-radius: 8px; padding: 10px; }}
-        li {{ padding: 6px; border-bottom: 1px solid #eee; }}
-        .done {{ color: #1e8e3e; }}
-        .todo {{ color: #d93025; }}
-        .timestamp {{ font-size: 0.85em; color: #777; margin-top: 40px; text-align: center; font-weight: 500; }}
+        ul {{ background: #f9f9f9; border: 1px solid #eee; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 0.8em; max-height: 200px; overflow-y: auto; list-style: none; }}
+        button {{ display: block; margin: 30px auto; padding: 12px 24px; background: #4285F4; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }}
     </style>
 </head>
 <body>
-    <div class="header"><h1>LMS Connect Migration Dashboard</h1></div>
-    <div class="container">
-        <div class="card">
-            <h2 style="color:#4285F4">Google Classroom</h2>
-            <div class="progress-container"><div class="progress-bar"></div></div>
-            <div class="stats" style="font-size:1.8em; font-weight:bold;">{percent}%</div>
-            <p><b>{count}</b> of {total} Districts Enabled</p>
-            <button class="btn-details" onclick="toggleDetails()">View District Lists</button>
-        </div>
-        <div class="card disabled"><h2>Canvas</h2><div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div><p>Coming Soon</p></div>
-        <div class="card disabled"><h2>Schoology</h2><div class="progress-container"><div class="progress-bar" style="width:0%;"></div></div><p>Coming Soon</p></div>
-    </div>
-    <div id="details-section">
-        <div class="columns">
-            <div class="column"><h3 class="done">✅ Transitioned ({count})</h3><ul>{completed_list_items}</ul></div>
-            <div class="column"><h3 class="todo">⏳ Pending ({len(pending)})</h3><ul>{pending_list_items}</ul></div>
-        </div>
-        <center><button class="btn-details" style="background:#666; margin-top:20px;" onclick="toggleDetails()">Close Details</button></center>
-    </div>
-    <div class="timestamp">Last Auto-Update: {display_time} (PT)</div>
-    <script>
-        function toggleDetails() {{
-            var el = document.getElementById("details-section");
-            el.style.display = (el.style.display === "none" || el.style.display === "") ? "block" : "none";
-            if(el.style.display === "block") el.scrollIntoView({{ behavior: 'smooth' }});
-        }}
-    </script>
+    <h1 style="text-align:center">LMS Connect Migration Hub</h1>
+    <div class="container">{cards_html}</div>
+    <button onclick="document.getElementById('details').style.display='flex'">View Detailed Breakdown</button>
+    <div id="details" class="columns">{details_html}</div>
+    <p style="text-align:center; color: #888; font-size: 0.8em; margin-top: 40px;">Last Sync: {display_time} (PT)</p>
 </body>
 </html>
 """
 
-with open(OUTPUT_HTML, "w") as f:
-    f.write(html_content)
+with open(os.path.join(BASE_DIR, "index.html"), "w") as f:
+    f.write(final_html)
