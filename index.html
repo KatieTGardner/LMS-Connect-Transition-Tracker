@@ -2,54 +2,85 @@
 <html>
 <head>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f4f7f9; padding: 40px; }
+        body { font-family: -apple-system, sans-serif; background: #f8f9fa; padding: 40px; color: #202124; }
         .container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 280px; text-align: center; }
-        .progress-container { background: #eee; border-radius: 10px; height: 12px; margin: 15px 0; overflow: hidden; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); width: 260px; text-align: center; }
+        .progress-container { background: #e8eaed; border-radius: 10px; height: 10px; margin: 15px 0; overflow: hidden; }
         .progress-bar { height: 100%; transition: width 1s; }
-        .stats { font-size: 2em; font-weight: bold; }
-        #details { display: none; background: white; padding: 30px; border-radius: 12px; margin-top: 30px; }
-        .columns { display: flex; gap: 20px; }
-        .column { flex: 1; }
-        ul { background: #f9f9f9; border: 1px solid #eee; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 0.8em; max-height: 200px; overflow-y: auto; list-style: none; }
-        button { display: block; margin: 30px auto; padding: 12px 24px; background: #4285F4; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .stats { font-size: 2.2em; font-weight: bold; margin-bottom: 5px; }
+        #details-section { display: none; background: white; padding: 30px; border-radius: 12px; margin: 30px auto; max-width: 1100px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .columns { display: flex; gap: 25px; flex-wrap: wrap; }
+        .column { flex: 1; min-width: 250px; }
+        .section-title { font-weight: bold; font-size: 0.85em; margin: 15px 0 5px 0; color: #1e8e3e; }
+        .section-title.todo { color: #d93025; }
+        ul { background: #f1f3f4; border-radius: 6px; padding: 10px; list-style: none; font-family: monospace; font-size: 0.8em; max-height: 150px; overflow-y: auto; margin: 0; }
+        li { padding: 3px 0; border-bottom: 1px solid #e8eaed; }
+        button { display: block; margin: 30px auto; padding: 12px 24px; background: #1a73e8; color: white; border: none; border-radius: 24px; font-weight: 500; cursor: pointer; }
+        button:hover { background: #1765cc; }
     </style>
 </head>
 <body>
-    <h1 style="text-align:center">LMS Connect Migration Hub</h1>
+    <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
     <div class="container">
     <div class="card">
-        <h2 style="color:#4285F4">Google Classroom</h2>
-        <div class="progress-container"><div class="progress-bar" style="background:#4285F4; width:0%"></div></div>
+        <h2 style="color:#34A853">Google Classroom</h2>
+        <div class="progress-container"><div class="progress-bar" style="background:#34A853; width:0%"></div></div>
         <div class="stats">0%</div>
-        <div style="font-size: 0.9em; margin-top: 10px;">
-            <div>🏢 Districts: <b>0/0</b></div>
-            <div>📱 Apps: <b>0/0</b></div>
+        <div style="font-size:0.85em; color:#555;">
+            🏢 Districts: <b>0/30</b><br>
+            📱 Apps: <b>0/7</b>
         </div>
+        <div style='color:#d93025; font-size:0.75em; margin-top:5px; font-weight:bold;'>⚠️ APP GATE CLOSED</div>
     </div>
     
     <div class="card">
         <h2 style="color:#E13939">Canvas</h2>
         <div class="progress-container"><div class="progress-bar" style="background:#E13939; width:0%"></div></div>
         <div class="stats">0%</div>
-        <div style="font-size: 0.9em; margin-top: 10px;">
-            <div>🏢 Districts: <b>0/0</b></div>
-            <div>📱 Apps: <b>0/0</b></div>
+        <div style="font-size:0.85em; color:#555;">
+            🏢 Districts: <b>0/30</b><br>
+            📱 Apps: <b>0/7</b>
         </div>
+        <div style='color:#d93025; font-size:0.75em; margin-top:5px; font-weight:bold;'>⚠️ APP GATE CLOSED</div>
     </div>
     
     <div class="card">
         <h2 style="color:#00AEEF">Schoology</h2>
         <div class="progress-container"><div class="progress-bar" style="background:#00AEEF; width:0%"></div></div>
         <div class="stats">0%</div>
-        <div style="font-size: 0.9em; margin-top: 10px;">
-            <div>🏢 Districts: <b>0/0</b></div>
-            <div>📱 Apps: <b>0/0</b></div>
+        <div style="font-size:0.85em; color:#555;">
+            🏢 Districts: <b>0/32</b><br>
+            📱 Apps: <b>0/7</b>
         </div>
+        <div style='color:#d93025; font-size:0.75em; margin-top:5px; font-weight:bold;'>⚠️ APP GATE CLOSED</div>
     </div>
     </div>
-    <button onclick="document.getElementById('details').style.display='flex'">View Detailed Breakdown</button>
-    <div id="details" class="columns"></div>
-    <p style="text-align:center; color: #888; font-size: 0.8em; margin-top: 40px;">Last Sync: Mar 20, 2026 at 10:50 AM (PT)</p>
+    <button onclick="document.getElementById('details-section').style.display='block'">View Detailed Breakdown</button>
+    <div id="details-section"><div class="columns">
+        <div class="column">
+            <h3 style="border-bottom: 3px solid #34A853; padding-bottom:5px;">Google Classroom Breakdown</h3>
+            <p class="section-title">✅ Districts Done (0)</p><ul><li>None</li></ul>
+            <p class="section-title todo">⏳ Districts Pending (30)</p><ul><li>52a9ce583aa89c9f0b001459</li><li>53bec0ab27e09eea30000004</li><li>54d3e3a60d98d20100000003</li><li>55b8ed512dfe310100001376</li><li>55d622a13a34fd010000204a</li><li>55d78fa9d5d0860100002325</li><li>55f0508f42e7e9010000323d</li><li>566eeec683ce280100000291</li><li>570ccae0dbfe7d01000001a4</li><li>5786c4dc78ef4c0100000758</li><li>582b26e00fc76a0100000316</li><li>583c88f495061200010fd094</li><li>5852a7fc54c28300012bfac0</li><li>588f83c7e191da00014dac7b</li><li>5995c8cd835c390001d1c5c0</li><li>59a5e029e5b3e100014769cf</li><li>5b2d6c79d7eb980001e444f8</li><li>5b6b14cbd970c3000121c496</li><li>5c34b67d66215e00011274fa</li><li>5c773873247142000127960e</li><li>5c995c2d1510850001375fed</li><li>5e715f93d5a83b00015b71d7</li><li>5e8ea92cf861970001c29c15</li><li>5ed675acb5be080001b9fbfb</li><li>5f19d6896aa24a0001b2a93d</li><li>5f343090a5122c00012fd7ac</li><li>6312537d628ffb9248fe334c</li><li>6329a4e06fc4a6f38e567a95</li><li>66a911dc937c9ba03035f871</li><li>66b27a9a57cf48e2bf4d9020</li></ul>
+            <p class="section-title">✅ Apps Ready (0)</p><ul><li>None</li></ul>
+            <p class="section-title todo">⚠️ Apps Missing (7)</p><ul><li>5501ca28059de501000000bb</li><li>5b2077fb03a826000165c4a1</li><li>5d41ba752769fb0001ae10fa</li><li>607472b92b7bf90001040d41</li><li>64cbff9e498f330001ce6412</li><li>66b1022e6c74dbaab2f81c82</li><li>68a35343a1f1a21425233bcf</li></ul>
+        </div>
+        
+        <div class="column">
+            <h3 style="border-bottom: 3px solid #E13939; padding-bottom:5px;">Canvas Breakdown</h3>
+            <p class="section-title">✅ Districts Done (0)</p><ul><li>None</li></ul>
+            <p class="section-title todo">⏳ Districts Pending (30)</p><ul><li>51a8f09d53fbaab560001243</li><li>5212608a7a69cd89450051d2</li><li>521e6e08f2e8ea1248000054</li><li>528b8974d7f9abc70b000072</li><li>5421ac510ade5b9d3c000826</li><li>5568958c6392110100000248</li><li>5576e45e4b17280100000049</li><li>55d2362a7bb201010000a682</li><li>569e2492be19c70100000370</li><li>571fb247d81c8501000008d0</li><li>57a09663def8410100000091</li><li>58d2bdbc13a0110001400ab7</li><li>590b52b1c6872d00010c9a0a</li><li>5994a7a03086ce000127cb47</li><li>59b021032ec0080001aee71c</li><li>5aea0241687cd90001b9bbbb</li><li>5b15680c3cd4bf000125cfe0</li><li>5b2942aa709e300001e2cd70</li><li>5b590e696521dc0001dc5b83</li><li>5bd73a5bfb184b0001f6ed90</li><li>5d939cfa13d20a0001d2f606</li><li>5ed51fe938841e00017da8a0</li><li>5f2c7f96fd700c00010f954b</li><li>62e02c37c8953c0d0adac902</li><li>62fbb65f47715c3034b2071d</li><li>64373ee71d94bf961e1c8690</li><li>653fafedebeb02304205f63e</li><li>667061f223de614259aea3e5</li><li>66a1599325ec771f84316407</li><li>687002328d5b953d639f3fc8</li></ul>
+            <p class="section-title">✅ Apps Ready (0)</p><ul><li>None</li></ul>
+            <p class="section-title todo">⚠️ Apps Missing (7)</p><ul><li>5501ca28059de501000000bb</li><li>5b2077fb03a826000165c4a1</li><li>5d41ba752769fb0001ae10fa</li><li>607472b92b7bf90001040d41</li><li>64cbff9e498f330001ce6412</li><li>66b1022e6c74dbaab2f81c82</li><li>68a35343a1f1a21425233bcf</li></ul>
+        </div>
+        
+        <div class="column">
+            <h3 style="border-bottom: 3px solid #00AEEF; padding-bottom:5px;">Schoology Breakdown</h3>
+            <p class="section-title">✅ Districts Done (0)</p><ul><li>None</li></ul>
+            <p class="section-title todo">⏳ Districts Pending (32)</p><ul><li>5245e2c552f6c40c0c000002</li><li>537f4b66193b06581c0001a9</li><li>5421c85e0cee6bb03b001934</li><li>55c3b4e9177e760100002bbb</li><li>55c54084b2d9a90100001b88</li><li>55e734ce8b848801000010a5</li><li>563cdcd905d2fd0100000126</li><li>5671a4ed1e5f2a01000003ad</li><li>570e9635d81c8501000002a8</li><li>57f7cf81a288860100000352</li><li>5875094fc11d8000019184d2</li><li>58dd680da16b3d00016e83f2</li><li>5911d40018258a00010f4033</li><li>5942875f74cb2e000143dfd2</li><li>595d39efbd6df400015af13b</li><li>596d785cd5bdcc00012c5f2c</li><li>599f1dc5a5551900014b1847</li><li>59a829bf6b849400011f6073</li><li>59cea8e214710700018a0156</li><li>5b7b5068ac16750001c6e78c</li><li>5b7c9e78a47b2e0001fba6bc</li><li>5b855c00ac16750001c6e7d2</li><li>5cb113cae04b970001f9fc18</li><li>5ec5fd0a12b9180001a4c762</li><li>5f46c0d3bc17ae00011cf871</li><li>5fb5a7435cdd6f95de9b2135</li><li>607579fe01dcadb42ebd914f</li><li>61365fc56f7c91e8d64fea8d</li><li>624350ae800fb93c79dd43e2</li><li>62f580b382744cd801d36923</li><li>66fd7fdf994beb2d2019921b</li><li>68220819280aa87e94eb0de2</li></ul>
+            <p class="section-title">✅ Apps Ready (0)</p><ul><li>None</li></ul>
+            <p class="section-title todo">⚠️ Apps Missing (7)</p><ul><li>5501ca28059de501000000bb</li><li>5b2077fb03a826000165c4a1</li><li>5d41ba752769fb0001ae10fa</li><li>607472b92b7bf90001040d41</li><li>64cbff9e498f330001ce6412</li><li>66b1022e6c74dbaab2f81c82</li><li>68a35343a1f1a21425233bcf</li></ul>
+        </div>
+        </div></div>
+    <p style="text-align:center; color: #70757a; font-size: 0.8em; margin-top: 40px;">Last Sync: Mar 20, 2026 at 11:06 AM (PT)</p>
 </body>
 </html>
