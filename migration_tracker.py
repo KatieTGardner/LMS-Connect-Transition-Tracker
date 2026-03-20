@@ -21,7 +21,7 @@ LMS_CONFIGS = {
     "google": {
         "file": "gc_targets.txt",
         "flag": "lms-connect-google-classroom-mvp",
-        "color": "#34A853", # Updated to Google Green
+        "color": "#34A853", # Google Green
         "title": "Google Classroom"
     },
     "canvas": {
@@ -58,7 +58,8 @@ def read_target_file(filename, prefix):
     path = os.path.join(BASE_DIR, filename)
     targets = []
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
+        # Using utf-8-sig handles hidden BOM characters from Windows/Excel
+        with open(path, "r", encoding="utf-8-sig") as f:
             for line in f:
                 val = line.strip().replace(" ", "")
                 if val:
@@ -75,16 +76,11 @@ for key, cfg in LMS_CONFIGS.items():
     districts_master = read_target_file(cfg['file'], "district:")
     ld_enabled = get_ld_enabled_ids(cfg['flag'])
     
-    # Check Apps specifically for this flag
     enabled_apps = [a for a in app_master_list if a in ld_enabled]
     pending_apps = [a for a in app_master_list if a not in ld_enabled]
     apps_ready = len(enabled_apps) > 0
     
-    # Logic: Districts only "Done" if App gate is open
-    completed_districts = []
-    if apps_ready:
-        completed_districts = [d for d in districts_master if d in ld_enabled]
-    
+    completed_districts = [d for d in districts_master if d in ld_enabled] if apps_ready else []
     pending_districts = [d for d in districts_master if d not in completed_districts]
     
     lms_results[key] = {
@@ -104,9 +100,8 @@ details_html = ""
 
 for key, cfg in LMS_CONFIGS.items():
     res = lms_results[key]
-    warning = "" if res['apps_ready'] else "<div style='color:#d93025; font-size:0.75em; margin-top:5px; font-weight:bold;'>⚠️ APP GATE CLOSED</div>"
+    warning = "" if res['apps_ready'] or res['total_d'] == 0 else "<div style='color:#d93025; font-size:0.75em; margin-top:5px; font-weight:bold;'>⚠️ APP GATE CLOSED</div>"
     
-    # Card UI
     cards_html += f"""
     <div class="card">
         <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
@@ -120,17 +115,15 @@ for key, cfg in LMS_CONFIGS.items():
     </div>
     """
     
-    # Details UI (Fixed and populated)
-    if res['total_d'] > 0 or res['total_a'] > 0:
+    if res['total_d'] > 0:
         def li(items): return "".join([f"<li>{i.split(':')[-1]}</li>" for i in sorted(items)]) if items else "<li>None</li>"
-        
         details_html += f"""
         <div class="column">
-            <h3 style="border-bottom: 3px solid {cfg['color']}; padding-bottom:5px;">{cfg['title']} Breakdown</h3>
-            <p class="section-title">✅ Districts Done ({len(res['comp_d'])})</p><ul>{li(res['comp_d'])}</ul>
-            <p class="section-title todo">⏳ Districts Pending ({len(res['pend_d'])})</p><ul>{li(res['pend_d'])}</ul>
-            <p class="section-title">✅ Apps Ready ({len(res['comp_a'])})</p><ul>{li(res['comp_a'])}</ul>
-            <p class="section-title todo">⚠️ Apps Missing ({len(res['pend_a'])})</p><ul>{li(res['pend_a'])}</ul>
+            <h3 style="border-bottom: 3px solid {cfg['color']}; padding-bottom:5px;">{cfg['title']}</h3>
+            <p style="font-weight:bold; color:#1e8e3e; font-size:0.8em; margin:10px 0 5px 0;">✅ Done ({len(res['comp_d'])})</p><ul>{li(res['comp_d'])}</ul>
+            <p style="font-weight:bold; color:#d93025; font-size:0.8em; margin:10px 0 5px 0;">⏳ Pending ({len(res['pend_d'])})</p><ul>{li(res['pend_d'])}</ul>
+            <p style="font-weight:bold; color:#555; font-size:0.8em; margin:15px 0 5px 0;">📱 Apps Status</p>
+            <div style="font-size:0.75em;">Ready: {len(res['comp_a'])} | Missing: {len(res['pend_a'])}</div>
         </div>
         """
 
@@ -146,16 +139,13 @@ final_html = f"""
         .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); width: 260px; text-align: center; }}
         .progress-container {{ background: #e8eaed; border-radius: 10px; height: 10px; margin: 15px 0; overflow: hidden; }}
         .progress-bar {{ height: 100%; transition: width 1s; }}
-        .stats {{ font-size: 2.2em; font-weight: bold; margin-bottom: 5px; }}
+        .stats {{ font-size: 2.2em; font-weight: bold; }}
         #details-section {{ display: none; background: white; padding: 30px; border-radius: 12px; margin: 30px auto; max-width: 1100px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }}
         .columns {{ display: flex; gap: 25px; flex-wrap: wrap; }}
-        .column {{ flex: 1; min-width: 250px; }}
-        .section-title {{ font-weight: bold; font-size: 0.85em; margin: 15px 0 5px 0; color: #1e8e3e; }}
-        .section-title.todo {{ color: #d93025; }}
-        ul {{ background: #f1f3f4; border-radius: 6px; padding: 10px; list-style: none; font-family: monospace; font-size: 0.8em; max-height: 150px; overflow-y: auto; margin: 0; }}
-        li {{ padding: 3px 0; border-bottom: 1px solid #e8eaed; }}
-        button {{ display: block; margin: 30px auto; padding: 12px 24px; background: #1a73e8; color: white; border: none; border-radius: 24px; font-weight: 500; cursor: pointer; }}
-        button:hover {{ background: #1765cc; }}
+        .column {{ flex: 1; min-width: 280px; }}
+        ul {{ background: #f1f3f4; border-radius: 6px; padding: 10px; list-style: none; font-family: monospace; font-size: 0.8em; max-height: 250px; overflow-y: auto; margin: 0; border: 1px solid #e8eaed; }}
+        li {{ padding: 4px 0; border-bottom: 1px solid #e8eaed; }}
+        button {{ display: block; margin: 30px auto; padding: 12px 28px; background: #1a73e8; color: white; border: none; border-radius: 24px; font-weight: 500; cursor: pointer; font-size: 1em; }}
     </style>
 </head>
 <body>
