@@ -7,21 +7,23 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
-# --- CONFIGURATION ---
+# --- 1. CONFIGURATION ---
+# Secrets from GitHub Actions
 LD_API_TOKEN = sys.argv
-# We'll store the Google JSON in a GitHub Secret
-GOOGLE_CREDS_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT') 
-SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg" # Found in your browser URL
+GOOGLE_CREDS_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 
-BASE_DIR = os.getcwd()
+# Your specific Spreadsheet ID (from the URL)
+SHEET_ID = "YOUR_SPREADSHEET_ID_HERE" 
+
 PROJECT_KEY = "default"
 ENV_KEY = "production"
 
+# Config mapping Tabs to Flags
 LMS_CONFIGS = {
     "google": {
         "tab": "[Data] Google Classroom - Districts",
         "flag": "lms-connect-google-classroom-mvp",
-        "color": "#34A853",
+        "color": "#34A853", # Google Green
         "title": "Google Classroom"
     },
     "canvas": {
@@ -38,94 +40,156 @@ LMS_CONFIGS = {
     }
 }
 
-# --- AUTHENTICATION ---
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds_dict = json.loads(GOOGLE_CREDS_JSON)
-creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-client = gspread.authorize(creds)
-sheet = client.open_by_key(SHEET_ID)
+# --- 2. AUTHENTICATION & DATA FETCHING ---
+def get_google_client():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = json.loads(GOOGLE_CREDS_JSON)
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    return gspread.authorize(creds)
 
 def get_ld_enabled_ids(flag_key):
     url = f"https://app.launchdarkly.com/api/v2/flags/{PROJECT_KEY}/{flag_key}"
     headers = {"Authorization": LD_API_TOKEN, "LD-API-Version": "beta"}
     try:
-        data = requests.get(url, headers=headers).json()
-        env_data = data.get('environments', {}).get(ENV_KEY, {})
+        res = requests.get(url, headers=headers).json()
+        env_data = res.get('environments', {}).get(ENV_KEY, {})
         enabled = []
+        # Targets
         for t in env_data.get('targets', []):
             if t.get('variation') == 0: enabled.extend(t.get('values', []))
+        # Rules
         for rule in env_data.get('rules', []):
             if rule.get('variation') == 0:
                 for c in rule.get('clauses', []): enabled.extend(c.get('values', []))
         return list(set([str(i).strip() for i in enabled if i]))
-    except:
+    except Exception as e:
+        print(f"Error fetching LD flag {flag_key}: {e}")
         return []
 
-# --- PROCESSING ---
+# --- 3. CORE LOGIC ---
+client = get_google_client()
+doc = client.open_by_key(SHEET_ID)
+
 lms_results = {}
 for key, cfg in LMS_CONFIGS.items():
-    worksheet = sheet.worksheet(cfg['tab'])
-    rows = worksheet.get_all_records() # Converts headers to dictionary keys
-    
-    ld_enabled = get_ld_enabled_ids(cfg['flag'])
-    
-    processed_districts = []
-    for row in rows:
-        raw_id = str(row['District Id']).strip()
-        prefixed_id = f"district:{raw_id}" if not raw_id.startswith("district:") else raw_id
+    try:
+        worksheet = doc.worksheet(cfg['tab'])
+        rows = worksheet.get_all_records() # Uses header row as keys
+        ld_enabled = get_ld_enabled_ids(cfg['flag'])
         
-        is_done = prefixed_id in ld_enabled
-        processed_districts.append({
-            "name": row['District Name'],
-            "csm": row['CSM Name'],
-            "segment": row['Segment'],
-            "status": "✅ Done" if is_done else "⏳ Pending",
-            "is_done": is_done
-        })
+        districts = []
+        for row in rows:
+            raw_id = str(row.get('District Id', '')).strip()
+            # Handle prefixing
+            prefixed = f"district:{raw_id}" if not raw_id.startswith("district:") else raw_id
+            
+            is_done = prefixed in ld_enabled
+            districts.append({
+                "name": row.get('District Name', 'Unknown Name'),
+                "csm": row.get('CSM Name', 'Unassigned'),
+                "segment": row.get('Segment', 'N/A'),
+                "is_done": is_done
+            })
+            
+        done_count = sum(1 for d in districts if d['is_done'])
+        lms_results[key] = {
+            "data": districts,
+            "done": done_count,
+            "total": len(districts),
+            "percent": int((done_count / len(districts)) * 100) if len(districts) > 0 else 0
+        }
+    except Exception as e:
+        print(f"Error processing {key}: {e}")
+        lms_results[key] = {"data": [], "done": 0, "total": 0, "percent": 0}
 
-    done_count = sum(1 for d in processed_districts if d['is_done'])
-    total_count = len(processed_districts)
-    
-    lms_results[key] = {
-        "districts": processed_districts,
-        "percent": int((done_count / total_count) * 100) if total_count > 0 else 0,
-        "done": done_count,
-        "total": total_count
-    }
-
-# --- HTML GENERATION ---
+# --- 4. HTML GENERATION ---
 cards_html = ""
-details_html = ""
+tables_html = ""
 
 for key, cfg in LMS_CONFIGS.items():
     res = lms_results[key]
+    
+    # Card UI
     cards_html += f"""
     <div class="card">
         <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
         <div class="progress-container"><div class="progress-bar" style="background:{cfg['color']}; width:{res['percent']}%"></div></div>
         <div class="stats">{res['percent']}%</div>
-        <p><b>{res['done']}</b> of {res['total']} Districts</p>
+        <p><b>{res['done']}</b> of {res['total']} Districts Enabled</p>
     </div>
     """
     
-    table_rows = "".join([f"""
+    # Table Rows
+    rows_html = ""
+    # Sort by Status (Pending first) then by Name
+    sorted_districts = sorted(res['data'], key=lambda x: (x['is_done'], x['name']))
+    for d in sorted_districts:
+        status_class = "status-done" if d['is_done'] else "status-pend"
+        status_text = "✅ Done" if d['is_done'] else "⏳ Pending"
+        rows_html += f"""
         <tr>
             <td>{d['name']}</td>
             <td>{d['segment']}</td>
             <td>{d['csm']}</td>
-            <td class="{'status-done' if d['is_done'] else 'status-pend'}">{d['status']}</td>
+            <td class="{status_class}">{status_text}</td>
         </tr>
-    """ for d in res['districts']])
-
-    details_html += f"""
-    <div class="detail-block">
-        <h3 style="color:{cfg['color']}">{cfg['title']} Roster</h3>
+        """
+        
+    tables_html += f"""
+    <div class="table-container">
+        <h3 style="border-left: 5px solid {cfg['color']}; padding-left:10px;">{cfg['title']} Breakdown</h3>
         <table>
-            <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
-            <tbody>{table_rows}</tbody>
+            <thead><tr><th>District Name</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
+            <tbody>{rows_html}</tbody>
         </table>
     </div>
     """
 
-# (Rest of the HTML/CSS/Timezone logic remains, but with wider table styles)
-# ... [Simplified for brevity, ensure you use the previous CSS + Table CSS] ...
+# Timezone
+pdt_now = datetime.datetime.now(timezone.utc) - timedelta(hours=7)
+timestamp = pdt_now.strftime('%b %d, %Y at %I:%M %p')
+
+final_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LMS Transition Tracker</title>
+    <style>
+        body {{ font-family: -apple-system, sans-serif; background: #f8f9fa; color: #202124; padding: 40px; line-height: 1.5; }}
+        .header {{ text-align: center; margin-bottom: 40px; }}
+        .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }}
+        .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 280px; text-align: center; }}
+        .progress-container {{ background: #e8eaed; border-radius: 10px; height: 12px; margin: 15px 0; overflow: hidden; }}
+        .progress-bar {{ height: 100%; transition: width 1s ease-in-out; }}
+        .stats {{ font-size: 2.5em; font-weight: bold; }}
+        
+        #details {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: none; }}
+        .table-container {{ margin-bottom: 40px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }}
+        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #e8eaed; }}
+        th {{ background: #f1f3f4; font-weight: 600; position: sticky; top: 0; }}
+        .status-done {{ color: #1e8e3e; font-weight: bold; }}
+        .status-pend {{ color: #d93025; font-weight: bold; }}
+        
+        .btn {{ display: block; margin: 0 auto 40px; padding: 12px 30px; background: #1a73e8; color: white; border: none; border-radius: 24px; font-weight: 500; cursor: pointer; font-size: 1em; }}
+        .timestamp {{ text-align: center; color: #70757a; font-size: 0.8em; margin-top: 40px; }}
+    </style>
+</head>
+<body>
+    <div class="header"><h1>LMS Connect Transition Hub</h1></div>
+    <div class="container">{cards_html}</div>
+    
+    <button class="btn" onclick="document.getElementById('details').style.display='block'; this.style.display='none'">View Detailed Roster</button>
+    
+    <div id="details">{tables_html}</div>
+    <div class="timestamp">Last Sync: {timestamp} (PT)</div>
+</body>
+</html>
+"""
+
+# Save to the root of the repo
+output_path = os.path.join(os.getcwd(), "index.html")
+with open(output_path, "w", encoding="utf-8") as f:
+    f.write(final_html)
+
+print(f"Build successful. Dashboard generated at {output_path}")
