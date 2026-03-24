@@ -149,43 +149,94 @@ for key, cfg in LMS_CONFIGS.items():
 pdt_now = datetime.datetime.now(timezone.utc) - timedelta(hours=7)
 timestamp = pdt_now.strftime('%b %d, %Y at %I:%M %p')
 
-final_html = f"""
+# --- HTML GENERATION ---
+cards_html = ""
+tables_html = ""
+
+for key, cfg in LMS_MAP.items():
+    res = lms_results[key]
+    
+    # Card UI
+    cards_html += f"""
+    <div class="card">
+        <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
+        <div class="bar"><div style="background:{cfg['color']}; width:{res['percent']}%"></div></div>
+        <div class="stats">{res['percent']}%</div>
+        <p><b>{res['done']}</b> of {res['total']} Districts</p>
+    </div>
+    """
+    
+    # Table Rows
+    rows_html = "".join([f"""
+        <tr>
+            <td>{d['n']}</td>
+            <td>{d['s']}</td>
+            <td>{d['c']}</td>
+            <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
+        </tr>
+    """ for d in sorted(res['data'], key=lambda x: x['n'])])
+
+    # The Collapsible "Dropdown" Section
+    tables_html += f"""
+    <details>
+        <summary style="border-left: 5px solid {cfg['color']};">
+            <span>{cfg['title']} Detailed Roster</span>
+            <span class="summary-stats">{res['done']}/{res['total']}</span>
+        </summary>
+        <div class="table-content">
+            <table>
+                <thead>
+                    <tr><th>District</th><th>Segment</th><th>CSM</th><th>Status</th></tr>
+                </thead>
+                <tbody>{rows_html if rows_html else '<tr><td colspan="4">No districts listed in sheet.</td></tr>'}</tbody>
+            </table>
+        </div>
+    </details>
+    """
+
+# Final Assembly
+ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
+
+full_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <title>LMS Transition Tracker</title>
     <style>
-        body {{ font-family: -apple-system, sans-serif; background: #f8f9fa; color: #202124; padding: 40px; line-height: 1.5; }}
-        .header {{ text-align: center; margin-bottom: 40px; }}
+        body {{ font-family: -apple-system, sans-serif; background: #f4f7f9; padding: 40px; color: #202124; }}
         .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }}
-        .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 280px; text-align: center; }}
-        .progress-container {{ background: #e8eaed; border-radius: 10px; height: 12px; margin: 15px 0; overflow: hidden; }}
-        .progress-bar {{ height: 100%; transition: width 1s ease-in-out; }}
+        .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 5px #0001; width: 260px; text-align: center; }}
+        .bar {{ background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }}
+        .bar div {{ height: 100%; transition: 1s; }}
         .stats {{ font-size: 2.5em; font-weight: bold; }}
         
-        #details {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: none; }}
-        .table-container {{ margin-bottom: 40px; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }}
-        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #e8eaed; }}
-        th {{ background: #f1f3f4; font-weight: 600; position: sticky; top: 0; }}
-        .status-done {{ color: #1e8e3e; font-weight: bold; }}
-        .status-pend {{ color: #d93025; font-weight: bold; }}
+        /* Accordion Styles */
+        details {{ background: white; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 3px #0001; overflow: hidden; max-width: 1000px; margin-left: auto; margin-right: auto; }}
+        summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; outline: none; }}
+        summary:hover {{ background: #fcfcfc; }}
+        .summary-stats {{ background: #f1f3f4; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; color: #5f6368; }}
         
-        .btn {{ display: block; margin: 0 auto 40px; padding: 12px 30px; background: #1a73e8; color: white; border: none; border-radius: 24px; font-weight: 500; cursor: pointer; font-size: 1em; }}
-        .timestamp {{ text-align: center; color: #70757a; font-size: 0.8em; margin-top: 40px; }}
+        .table-content {{ padding: 0 20px 20px; border-top: 1px solid #eee; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: left; }}
+        th, td {{ padding: 12px 8px; border-bottom: 1px solid #f1f3f4; }}
+        th {{ color: #5f6368; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; }}
+        .ok {{ color: #1e8e3e; font-weight: bold; }}
+        .no {{ color: #d93025; }}
+        
+        .timestamp {{ text-align: center; color: #9aa0a6; font-size: 0.8em; margin-top: 50px; }}
     </style>
 </head>
 <body>
-    <div class="header"><h1>LMS Connect Transition Hub</h1></div>
+    <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
     <div class="container">{cards_html}</div>
-    
-    <button class="btn" onclick="document.getElementById('details').style.display='block'; this.style.display='none'">View Detailed Roster</button>
-    
-    <div id="details">{tables_html}</div>
-    <div class="timestamp">Last Sync: {timestamp} (PT)</div>
+    {tables_html}
+    <div class="timestamp">Last Sync: {ts} (PT)</div>
 </body>
 </html>
 """
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(full_html)
 
 # Save to the root of the repo
 output_path = os.path.join(os.getcwd(), "index.html")
