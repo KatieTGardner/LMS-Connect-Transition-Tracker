@@ -43,3 +43,11 @@ jobs:
           git add index.html
           git commit -m "Update Dashboard" || exit 0
           git push origin main # or gh-pages
+
+- name: Install dependencies
+        run: pip install requests gspread google-auth
+
+      - name: Run Tracker Script
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+        run: python migration_tracker.py ${{ secrets.LD_API_KEY }}
