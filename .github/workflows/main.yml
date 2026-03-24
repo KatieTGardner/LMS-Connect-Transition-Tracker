@@ -2,7 +2,7 @@ name: Update Migration Dashboard
 on:
   schedule:
     - cron: '0 * * * *'  # Runs every hour
-  workflow_dispatch:      # THIS LINE ALLOWS THE MANUAL RUN BUTTON TO WORK
+  workflow_dispatch:      # Allows manual runs
   push:
     branches:
       - main
@@ -15,48 +15,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: pip install requests
-
-      - name: Install dependencies
-        run: pip install requests gspread google-auth 
+        run: pip install requests gspread google-auth
 
       - name: Run migration script
         env:
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }} 
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
         run: python migration_tracker.py ${{ secrets.LD_API_KEY }}
-
-      - name: Run migration script
-        # This passes your Secret Key into the script as the argument we set up!
-        run: python migration_tracker.py ${{ secrets.LD_API_KEY }}
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          publish_branch: gh-pages
 
       - name: Commit and Push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.io"
           git add index.html
-          git commit -m "Update Dashboard" || exit 0
-          git push origin main # or gh-pages
-      
-      steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
+          git commit -m "Update Dashboard from Google Sheet" || exit 0
+          git push
