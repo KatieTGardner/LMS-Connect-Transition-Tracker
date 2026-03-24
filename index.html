@@ -2,773 +2,679 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LMS Transition Tracker</title>
+    <meta charset="UTF-8">
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f8f9fa; color: #202124; padding: 40px; line-height: 1.5; }
-        .header { text-align: center; margin-bottom: 40px; }
+        body { font-family: -apple-system, sans-serif; background: #f4f7f9; padding: 40px; color: #202124; }
         .container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 280px; text-align: center; }
-        .progress-container { background: #e8eaed; border-radius: 10px; height: 12px; margin: 15px 0; overflow: hidden; }
-        .progress-bar { height: 100%; transition: width 1s ease-in-out; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); width: 260px; text-align: center; }
+        .bar { background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }
+        .bar div { height: 100%; transition: width 1s; }
         .stats { font-size: 2.5em; font-weight: bold; }
-        
-        #details { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: none; }
-        .table-container { margin-bottom: 40px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e8eaed; }
-        th { background: #f1f3f4; font-weight: 600; position: sticky; top: 0; }
-        .status-done { color: #1e8e3e; font-weight: bold; }
-        .status-pend { color: #d93025; font-weight: bold; }
-        
-        .btn { display: block; margin: 0 auto 40px; padding: 12px 30px; background: #1a73e8; color: white; border: none; border-radius: 24px; font-weight: 500; cursor: pointer; font-size: 1em; }
-        .timestamp { text-align: center; color: #70757a; font-size: 0.8em; margin-top: 40px; }
+        details { background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1000px; overflow: hidden; }
+        summary { padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; outline: none; }
+        .sum-count { background: #f1f3f4; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; }
+        .table-wrap { padding: 0 20px 20px; border-top: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: left; }
+        th, td { padding: 12px 8px; border-bottom: 1px solid #f1f3f4; }
+        .ok { color: #1e8e3e; font-weight: bold; } .no { color: #d93025; }
+        .ts { text-align: center; color: #9aa0a6; font-size: 0.8em; margin-top: 50px; }
     </style>
 </head>
 <body>
-    <div class="header"><h1>LMS Connect Transition Hub</h1></div>
+    <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
     <div class="container">
-    <div class="card">
-        <h2 style="color:#34A853">Google Classroom</h2>
-        <div class="progress-container"><div class="progress-bar" style="background:#34A853; width:0%"></div></div>
-        <div class="stats">0%</div>
-        <p><b>0</b> of 34 Districts Enabled</p>
-    </div>
+        <div class="card">
+            <h2 style="color:#34A853">Google Classroom</h2>
+            <div class="bar"><div style="width:0%;background:#34A853"></div></div>
+            <div class="stats">0%</div>
+            <p><b>0</b> / 34 Districts</p>
+            <div style='color:#d93025;font-size:11px;font-weight:bold;margin-top:5px;'>⚠️ APP GATE CLOSED</div>
+        </div>
+        <div class="card">
+            <h2 style="color:#E13939">Canvas</h2>
+            <div class="bar"><div style="width:0%;background:#E13939"></div></div>
+            <div class="stats">0%</div>
+            <p><b>0</b> / 31 Districts</p>
+            <div style='color:#d93025;font-size:11px;font-weight:bold;margin-top:5px;'>⚠️ APP GATE CLOSED</div>
+        </div>
+        <div class="card">
+            <h2 style="color:#00AEEF">Schoology</h2>
+            <div class="bar"><div style="width:0%;background:#00AEEF"></div></div>
+            <div class="stats">0%</div>
+            <p><b>0</b> / 34 Districts</p>
+            <div style='color:#d93025;font-size:11px;font-weight:bold;margin-top:5px;'>⚠️ APP GATE CLOSED</div>
+        </div></div>
     
-    <div class="card">
-        <h2 style="color:#E13939">Canvas</h2>
-        <div class="progress-container"><div class="progress-bar" style="background:#E13939; width:0%"></div></div>
-        <div class="stats">0%</div>
-        <p><b>0</b> of 31 Districts Enabled</p>
-    </div>
-    
-    <div class="card">
-        <h2 style="color:#00AEEF">Schoology</h2>
-        <div class="progress-container"><div class="progress-bar" style="background:#00AEEF; width:0%"></div></div>
-        <div class="stats">0%</div>
-        <p><b>0</b> of 34 Districts Enabled</p>
-    </div>
-    </div>
-    
-    <button class="btn" onclick="document.getElementById('details').style.display='block'; this.style.display='none'">View Detailed Roster</button>
-    
-    <div id="details">
-    <div class="table-container">
-        <h3 style="border-left: 5px solid #34A853; padding-left:10px;">Google Classroom Breakdown</h3>
-        <table>
-            <thead><tr><th>District Name</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
-            <tbody>
-        <tr>
-            <td>Abby Kelley Foster Charter Public School</td>
-            <td>Scaled District</td>
-            <td>Becky George</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Bergenfield School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Berkeley Heights Public School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Boston Renaissance Charter Sch</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Central Valley School District</td>
-            <td>Scaled District</td>
-            <td>Becky George</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Elementary School District 159</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Enid School District I-57</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Frost Ind School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Guthrie School District I-01</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Hanover Twp Public Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Haslett Public School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Lawton Independent School District 8</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Maricopa Unified School District 20</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Marion County School District</td>
-            <td>Scaled District</td>
-            <td>Becky George</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Monmouth-Roseville CUSD 238</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Morris Elementary School District 54</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Nauset Public Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>New Prague Area Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>New Ulm Public School District 88</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Oklahoma Union Public Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Oologah Talala School District 4</td>
-            <td>Scaled District</td>
-            <td>Becky George</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Parma City School District</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Prairie View USD</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Pueblo School for Arts and Sciences</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Reed-Custer Community Unit School District 255-U</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>School District Of Belleville</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>The American School Foundation MX</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Triton Regional School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Verona School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>West Hardin Co Cons Sch Dist</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Wharton School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Wood Dale School District 7</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Woodcliff Lake School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Worcester Public School District</td>
-            <td>Mid District</td>
-            <td>Tashi Bordenave</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        </tbody>
-        </table>
-    </div>
-    
-    <div class="table-container">
-        <h3 style="border-left: 5px solid #E13939; padding-left:10px;">Canvas Breakdown</h3>
-        <table>
-            <thead><tr><th>District Name</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
-            <tbody>
-        <tr>
-            <td>Anderson Community School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Basehor-Linwood USD 458</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Bayaan Academy</td>
-            <td>Scaled District</td>
-            <td>#N/A</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Bixby Public Schools</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Broken Arrow School District</td>
-            <td>Mid District</td>
-            <td>Danielle Windley</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Camden County Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Charles City County School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Columbus City School District</td>
-            <td>Big District</td>
-            <td>#N/A</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Coweta Charter Academy</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Edmonds School District #15</td>
-            <td>Mid District</td>
-            <td>VeCartier Johnson</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Freedom Prep Academy</td>
-            <td>Scaled District</td>
-            <td>#N/A</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Georgia Cyber Academy</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Iowa City Community School District</td>
-            <td>Mid District</td>
-            <td>Tashi Bordenave</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Jenks School District 5</td>
-            <td>Mid District</td>
-            <td>#N/A</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Keystone School</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Lauderdale County School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Liberty 53 School District</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Meridian Technology Center</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Moore School District I-2</td>
-            <td>Mid District</td>
-            <td>Emily Bleibel</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>National Education Equity Lab</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Norman Independent School District 29</td>
-            <td>Mid District</td>
-            <td>Danielle Windley</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Oak Ridge School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Pattonville School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Piedmont Classical High School</td>
-            <td>Scaled District</td>
-            <td>#N/A</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Premier Prep Online Academy</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Sage Oak Charter Schools</td>
-            <td>Scaled District</td>
-            <td>Becky George</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Summit Christian Academy</td>
-            <td>Scaled District</td>
-            <td>Becky George</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Sycamore Community Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Union Pub School District I-9</td>
-            <td>Mid District</td>
-            <td>#N/A</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Woodford County School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>York County School Division</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        </tbody>
-        </table>
-    </div>
-    
-    <div class="table-container">
-        <h3 style="border-left: 5px solid #00AEEF; padding-left:10px;">Schoology Breakdown</h3>
-        <table>
-            <thead><tr><th>District Name</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
-            <tbody>
-        <tr>
-            <td>Albert Einstein Academies</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Aloha Academy</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Auburn City School District</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>CHP Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Caroline County Public Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Chickasaw City School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Columbus Municipal School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Conestoga Valley School Dist</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Crosby Independent School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Eden Prairie Schools</td>
-            <td>Scaled District</td>
-            <td>Abby Ali</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Elk River Area School District</td>
-            <td>Mid District</td>
-            <td>VeCartier Johnson</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Exeter Township School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Jim Thorpe Area School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Kanawha Co School District</td>
-            <td>Mid District</td>
-            <td>Tashi Bordenave</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Limestone County School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>McAlester School District I-80</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Miami Christian School</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Montgomery Public Schools</td>
-            <td>Mid District</td>
-            <td>Danielle Windley</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Mountain View School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Port Arthur Ind School Dist</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Putnam County Schools</td>
-            <td>Scaled District</td>
-            <td>Emily Bleibel</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>REAP International K12 Schools</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>School Administrative Unit 19</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>School Administrative Unit 70</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Skokie School District 69</td>
-            <td>Scaled District</td>
-            <td>Becky George</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>South Washington County School District 833</td>
-            <td>Mid District</td>
-            <td>VeCartier Johnson</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Southgate Community School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>St John's Jesuit High School</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Stevens Point Area Public School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Telluride School District R-1</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Union City Community School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Weatherford School Dist 26</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>West Side Christian School</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        
-        <tr>
-            <td>Windham School District</td>
-            <td>Scaled District</td>
-            <td>Clever Admin</td>
-            <td class="status-pend">⏳ Pending</td>
-        </tr>
-        </tbody>
-        </table>
-    </div>
-    </div>
-    <div class="timestamp">Last Sync: Mar 24, 2026 at 01:04 PM (PT)</div>
+        <details>
+            <summary style="border-left: 5px solid #34A853;">
+                <span>Google Classroom Detailed Roster</span>
+                <span class="sum-count">0 / 34</span>
+            </summary>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
+                    <tbody>
+            <tr>
+                <td>Abby Kelley Foster Charter Public School</td>
+                <td>Scaled District</td>
+                <td>Becky George</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Bergenfield School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Berkeley Heights Public School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Boston Renaissance Charter Sch</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Central Valley School District</td>
+                <td>Scaled District</td>
+                <td>Becky George</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Elementary School District 159</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Enid School District I-57</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Frost Ind School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Guthrie School District I-01</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Hanover Twp Public Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Haslett Public School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Lawton Independent School District 8</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Maricopa Unified School District 20</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Marion County School District</td>
+                <td>Scaled District</td>
+                <td>Becky George</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Monmouth-Roseville CUSD 238</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Morris Elementary School District 54</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Nauset Public Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>New Prague Area Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>New Ulm Public School District 88</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Oklahoma Union Public Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Oologah Talala School District 4</td>
+                <td>Scaled District</td>
+                <td>Becky George</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Parma City School District</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Prairie View USD</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Pueblo School for Arts and Sciences</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Reed-Custer Community Unit School District 255-U</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>School District Of Belleville</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>The American School Foundation MX</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Triton Regional School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Verona School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>West Hardin Co Cons Sch Dist</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Wharton School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Wood Dale School District 7</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Woodcliff Lake School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Worcester Public School District</td>
+                <td>Mid District</td>
+                <td>Tashi Bordenave</td>
+                <td class="no">⏳ Pending</td>
+            </tr></tbody>
+                </table>
+            </div>
+        </details>
+        <details>
+            <summary style="border-left: 5px solid #E13939;">
+                <span>Canvas Detailed Roster</span>
+                <span class="sum-count">0 / 31</span>
+            </summary>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
+                    <tbody>
+            <tr>
+                <td>Anderson Community School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Basehor-Linwood USD 458</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Bayaan Academy</td>
+                <td>Scaled District</td>
+                <td>#N/A</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Bixby Public Schools</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Broken Arrow School District</td>
+                <td>Mid District</td>
+                <td>Danielle Windley</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Camden County Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Charles City County School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Columbus City School District</td>
+                <td>Big District</td>
+                <td>#N/A</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Coweta Charter Academy</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Edmonds School District #15</td>
+                <td>Mid District</td>
+                <td>VeCartier Johnson</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Freedom Prep Academy</td>
+                <td>Scaled District</td>
+                <td>#N/A</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Georgia Cyber Academy</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Iowa City Community School District</td>
+                <td>Mid District</td>
+                <td>Tashi Bordenave</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Jenks School District 5</td>
+                <td>Mid District</td>
+                <td>#N/A</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Keystone School</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Lauderdale County School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Liberty 53 School District</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Meridian Technology Center</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Moore School District I-2</td>
+                <td>Mid District</td>
+                <td>Emily Bleibel</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>National Education Equity Lab</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Norman Independent School District 29</td>
+                <td>Mid District</td>
+                <td>Danielle Windley</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Oak Ridge School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Pattonville School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Piedmont Classical High School</td>
+                <td>Scaled District</td>
+                <td>#N/A</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Premier Prep Online Academy</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Sage Oak Charter Schools</td>
+                <td>Scaled District</td>
+                <td>Becky George</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Summit Christian Academy</td>
+                <td>Scaled District</td>
+                <td>Becky George</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Sycamore Community Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Union Pub School District I-9</td>
+                <td>Mid District</td>
+                <td>#N/A</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Woodford County School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>York County School Division</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr></tbody>
+                </table>
+            </div>
+        </details>
+        <details>
+            <summary style="border-left: 5px solid #00AEEF;">
+                <span>Schoology Detailed Roster</span>
+                <span class="sum-count">0 / 34</span>
+            </summary>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
+                    <tbody>
+            <tr>
+                <td>Albert Einstein Academies</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Aloha Academy</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Auburn City School District</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>CHP Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Caroline County Public Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Chickasaw City School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Columbus Municipal School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Conestoga Valley School Dist</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Crosby Independent School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Eden Prairie Schools</td>
+                <td>Scaled District</td>
+                <td>Abby Ali</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Elk River Area School District</td>
+                <td>Mid District</td>
+                <td>VeCartier Johnson</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Exeter Township School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Jim Thorpe Area School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Kanawha Co School District</td>
+                <td>Mid District</td>
+                <td>Tashi Bordenave</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Limestone County School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>McAlester School District I-80</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Miami Christian School</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Montgomery Public Schools</td>
+                <td>Mid District</td>
+                <td>Danielle Windley</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Mountain View School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Port Arthur Ind School Dist</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Putnam County Schools</td>
+                <td>Scaled District</td>
+                <td>Emily Bleibel</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>REAP International K12 Schools</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>School Administrative Unit 19</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>School Administrative Unit 70</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Skokie School District 69</td>
+                <td>Scaled District</td>
+                <td>Becky George</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>South Washington County School District 833</td>
+                <td>Mid District</td>
+                <td>VeCartier Johnson</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Southgate Community School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>St John's Jesuit High School</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Stevens Point Area Public School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Telluride School District R-1</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Union City Community School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Weatherford School Dist 26</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>West Side Christian School</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr>
+            <tr>
+                <td>Windham School District</td>
+                <td>Scaled District</td>
+                <td>Clever Admin</td>
+                <td class="no">⏳ Pending</td>
+            </tr></tbody>
+                </table>
+            </div>
+        </details>
+    <div class="ts">Last Sync: Mar 24, 2026 at 01:49 PM (PT)</div>
 </body>
 </html>
