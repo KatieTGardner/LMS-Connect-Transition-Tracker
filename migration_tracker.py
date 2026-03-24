@@ -11,7 +11,7 @@ from datetime import timezone, timedelta
 LD_API_TOKEN = sys.argv
 # We'll store the Google JSON in a GitHub Secret
 GOOGLE_CREDS_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT') 
-SHEET_ID = "YOUR_SPREADSHEET_ID_HERE" # Found in your browser URL
+SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg" # Found in your browser URL
 
 BASE_DIR = os.getcwd()
 PROJECT_KEY = "default"
