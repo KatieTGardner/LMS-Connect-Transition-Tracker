@@ -13,7 +13,7 @@ LD_API_TOKEN = sys.argv
 GOOGLE_CREDS_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 
 # Your specific Spreadsheet ID (from the URL)
-SHEET_ID = "YOUR_SPREADSHEET_ID_HERE" 
+SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg" 
 
 PROJECT_KEY = "default"
 ENV_KEY = "production"
