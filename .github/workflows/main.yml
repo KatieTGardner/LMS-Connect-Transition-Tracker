@@ -25,6 +25,14 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Install dependencies
+        run: pip install requests gspread google-auth 
+
+      - name: Run migration script
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }} 
+        run: python migration_tracker.py ${{ secrets.LD_API_KEY }}
+
       - name: Run migration script
         # This passes your Secret Key into the script as the argument we set up!
         run: python migration_tracker.py ${{ secrets.LD_API_KEY }}
@@ -44,10 +52,11 @@ jobs:
           git commit -m "Update Dashboard" || exit 0
           git push origin main # or gh-pages
       
-      - name: Install dependencies
-        run: pip install requests gspread google-auth
-      
-      - name: Run Tracker Script
-        env:
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-        run: python migration_tracker.py ${{ secrets.LD_API_KEY }}
+      steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
