@@ -1,12 +1,11 @@
-import requests, datetime, sys, os, json, gspread
+import requests, datetime, sys, os, json, gspread, re
 from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
 # --- 1. CONFIGURATION ---
 LD_TOKEN = sys.argv
 GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
-# Double check this ID matches your Google Sheet URL
-SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
+SHEET_ID = "142A9794u_M87ZqB0fI-y0Ue_k78qP_W5667vC7V7-4U"
 ENV = "production"
 
 LMS_CONFIGS = {
@@ -17,7 +16,6 @@ LMS_CONFIGS = {
 
 def get_ld(flag):
     url = f"https://app.launchdarkly.com/api/v2/flags/default/{flag}"
-    # Ensuring the token is passed as a simple string
     headers = {"Authorization": str(LD_TOKEN), "LD-API-Version": "beta"}
     try:
         res = requests.get(url, headers=headers).json()
@@ -37,29 +35,35 @@ def get_ld(flag):
 try:
     creds_dict = json.loads(GOOG_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-    client = gspread.authorize(creds)
-    doc = client.open_by_key(SHEET_ID)
+    doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 except Exception as e:
-    print(f"CRITICAL ERROR: Could not open Google Sheet. Check ID and Service Account permissions. {e}")
+    print(f"CRITICAL ERROR: {e}")
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
+
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['tab']).get_all_records()
         ld_ids = get_ld(cfg['flag'])
-        
         apps_ok = any(i.startswith("app:") for i in ld_ids)
         
         districts_data = []
         for r in rows:
             rid = str(r.get('District Id', '')).strip()
             pre = f"district:{rid}" if not rid.startswith("district:") else rid
+            
+            # Handle Connected Apps column (Flexible delimiters: comma, semicolon, or pipe)
+            raw_apps = str(r.get('Connected Apps', '')).strip()
+            app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
+            formatted_apps = ", ".join(app_list) if app_list else "None"
+            
             is_done = pre in ld_ids and apps_ok
             districts_data.append({
                 "name": r.get('District Name', rid), 
                 "segment": r.get('Segment', 'N/A'), 
                 "csm": r.get('CSM Name', 'N/A'), 
+                "apps": formatted_apps,
                 "done": is_done
             })
         
@@ -82,6 +86,7 @@ for key, cfg in LMS_CONFIGS.items():
                 <td>{d['name']}</td>
                 <td>{d['segment']}</td>
                 <td>{d['csm']}</td>
+                <td class="app-cell">{d['apps']}</td>
                 <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
             </tr>""" for d in sorted(districts_data, key=lambda x: x['name'])])
         
@@ -93,15 +98,15 @@ for key, cfg in LMS_CONFIGS.items():
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Status</th></tr></thead>
-                    <tbody>{rows_html if rows_html else '<tr><td colspan="4">No data found in sheet tab.</td></tr>'}</tbody>
+                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Apps</th><th>Status</th></tr></thead>
+                    <tbody>{rows_html if rows_html else '<tr><td colspan="5">No data found in sheet.</td></tr>'}</tbody>
                 </table>
             </div>
         </details>"""
     except Exception as e:
-        print(f"Error processing tab {cfg['tab']}: {e}")
+        print(f"Error on tab {cfg['tab']}: {e}")
 
-# --- 3. ASSEMBLY ---
+# --- 3. HTML ASSEMBLY ---
 ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
 
 final_content = f"""
@@ -109,6 +114,7 @@ final_content = f"""
 <html>
 <head>
     <meta charset="UTF-8">
+    <title>LMS Transition Tracker</title>
     <style>
         body {{ font-family: -apple-system, sans-serif; background: #f4f7f9; padding: 40px; color: #202124; }}
         .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }}
@@ -116,13 +122,19 @@ final_content = f"""
         .bar {{ background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }}
         .bar div {{ height: 100%; transition: width 1s; }}
         .stats {{ font-size: 2.5em; font-weight: bold; }}
-        details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1000px; overflow: hidden; }}
+        
+        details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1100px; overflow: hidden; }}
         summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; outline: none; }}
+        summary:hover {{ background: #fafafa; }}
         .sum-count {{ background: #f1f3f4; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; }}
-        .table-wrap {{ padding: 0 20px 20px; border-top: 1px solid #eee; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: left; }}
+        
+        .table-wrap {{ padding: 0 20px 20px; border-top: 1px solid #eee; overflow-x: auto; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 800px; }}
         th, td {{ padding: 12px 8px; border-bottom: 1px solid #f1f3f4; }}
-        .ok {{ color: #1e8e3e; font-weight: bold; }} .no {{ color: #d93025; }}
+        th {{ color: #5f6368; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }}
+        .app-cell {{ color: #5f6368; font-style: italic; max-width: 300px; white-space: normal; }}
+        .ok {{ color: #1e8e3e; font-weight: bold; }}
+        .no {{ color: #d93025; font-weight: bold; }}
         .ts {{ text-align: center; color: #9aa0a6; font-size: 0.8em; margin-top: 50px; }}
     </style>
 </head>
