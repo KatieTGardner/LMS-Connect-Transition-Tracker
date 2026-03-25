@@ -5,7 +5,7 @@ from datetime import timezone, timedelta
 # --- 1. CONFIGURATION ---
 LD_TOKEN = sys.argv
 GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
-SHEET_ID = "142A9794u_M87ZqB0fI-y0Ue_k78qP_W5667vC7V7-4U"
+SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
 
 LMS_CONFIGS = {
