@@ -53,10 +53,14 @@ for key, cfg in LMS_CONFIGS.items():
             rid = str(r.get('District Id', '')).strip()
             pre = f"district:{rid}" if not rid.startswith("district:") else rid
             
-            # Handle Connected Apps column (Flexible delimiters: comma, semicolon, or pipe)
+            # Connected Apps
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
+
+            # NEW: BTS Dates
+            bts_date = str(r.get('BTS Dates', 'TBD')).strip()
+            if not bts_date: bts_date = "TBD"
             
             is_done = pre in ld_ids and apps_ok
             districts_data.append({
@@ -64,6 +68,7 @@ for key, cfg in LMS_CONFIGS.items():
                 "segment": r.get('Segment', 'N/A'), 
                 "csm": r.get('CSM Name', 'N/A'), 
                 "apps": formatted_apps,
+                "bts": bts_date, # Added field
                 "done": is_done
             })
         
@@ -81,15 +86,18 @@ for key, cfg in LMS_CONFIGS.items():
             {warn}
         </div>"""
         
+        # Added BTS Date column to the row generation
         rows_html = "".join([f"""
             <tr>
                 <td>{d['name']}</td>
                 <td>{d['segment']}</td>
                 <td>{d['csm']}</td>
                 <td class="app-cell">{d['apps']}</td>
+                <td class="bts-cell">{d['bts']}</td>
                 <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
             </tr>""" for d in sorted(districts_data, key=lambda x: x['name'])])
         
+        # Added BTS to the header
         dropdowns_html += f"""
         <details>
             <summary style="border-left: 5px solid {cfg['color']};">
@@ -98,8 +106,8 @@ for key, cfg in LMS_CONFIGS.items():
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Apps</th><th>Status</th></tr></thead>
-                    <tbody>{rows_html if rows_html else '<tr><td colspan="5">No data found in sheet.</td></tr>'}</tbody>
+                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <tbody>{rows_html if rows_html else '<tr><td colspan="6">No data found in sheet.</td></tr>'}</tbody>
                 </table>
             </div>
         </details>"""
@@ -123,16 +131,17 @@ final_content = f"""
         .bar div {{ height: 100%; transition: width 1s; }}
         .stats {{ font-size: 2.5em; font-weight: bold; }}
         
-        details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1100px; overflow: hidden; }}
+        details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1200px; overflow: hidden; }}
         summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; outline: none; }}
         summary:hover {{ background: #fafafa; }}
         .sum-count {{ background: #f1f3f4; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; }}
         
         .table-wrap {{ padding: 0 20px 20px; border-top: 1px solid #eee; overflow-x: auto; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 800px; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 900px; }}
         th, td {{ padding: 12px 8px; border-bottom: 1px solid #f1f3f4; }}
         th {{ color: #5f6368; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }}
-        .app-cell {{ color: #5f6368; font-style: italic; max-width: 300px; white-space: normal; }}
+        .app-cell {{ color: #5f6368; font-style: italic; max-width: 250px; white-space: normal; }}
+        .bts-cell {{ font-weight: 500; color: #1a73e8; }}
         .ok {{ color: #1e8e3e; font-weight: bold; }}
         .no {{ color: #d93025; font-weight: bold; }}
         .ts {{ text-align: center; color: #9aa0a6; font-size: 0.8em; margin-top: 50px; }}
