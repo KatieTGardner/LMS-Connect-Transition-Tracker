@@ -5,23 +5,30 @@
     <meta charset="UTF-8">
     <title>LMS Transition Tracker</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f4f7f9; padding: 40px; color: #202124; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f4f7f9; padding: 40px; color: #202124; line-height: 1.5; }
         .container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); width: 260px; text-align: center; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); width: 260px; text-align: center; border: 1px solid #e0e0e0; }
         .bar { background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }
         .bar div { height: 100%; transition: width 1s; }
         .stats { font-size: 2.5em; font-weight: bold; }
+        .app-warn { color:#d93025; font-size:11px; font-weight:bold; margin-top:5px; }
         
-        details { background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1200px; overflow: hidden; }
-        summary { padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; outline: none; }
-        summary:hover { background: #fafafa; }
+        details { background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1300px; border: 1px solid #e0e0e0; }
+        summary { padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
         .sum-count { background: #f1f3f4; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; }
         
-        .table-wrap { padding: 0 20px 20px; border-top: 1px solid #eee; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 900px; }
-        th, td { padding: 12px 8px; border-bottom: 1px solid #f1f3f4; }
+        .table-wrap { padding: 0 20px 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #f1f3f4; vertical-align: top; }
         th { color: #5f6368; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }
-        .app-cell { color: #5f6368; font-style: italic; max-width: 250px; white-space: normal; }
+        
+        /* District ID Styling */
+        .district-info { display: flex; flex-direction: column; gap: 4px; }
+        .d-name { font-weight: 600; color: #202124; }
+        .d-id { font-family: monospace; font-size: 0.8em; color: #9aa0a6; cursor: pointer; display: inline-block; }
+        .d-id:hover { color: #1a73e8; text-decoration: underline; }
+        
+        .app-cell { color: #5f6368; font-style: italic; max-width: 300px; word-wrap: break-word; }
         .bts-cell { font-weight: 500; color: #1a73e8; }
         .ok { color: #1e8e3e; font-weight: bold; }
         .no { color: #d93025; font-weight: bold; }
@@ -36,21 +43,21 @@
             <div class="bar"><div style="width:0%;background:#34A853"></div></div>
             <div class="stats">0%</div>
             <p><b>0</b> / 35 Districts</p>
-            <div style='color:#d93025;font-size:11px;font-weight:bold;margin-top:5px;'>⚠️ APP GATE CLOSED</div>
+            <div class='app-warn'>⚠️ APP GATE CLOSED</div>
         </div>
         <div class="card">
             <h2 style="color:#E13939">Canvas</h2>
             <div class="bar"><div style="width:0%;background:#E13939"></div></div>
             <div class="stats">0%</div>
             <p><b>0</b> / 31 Districts</p>
-            <div style='color:#d93025;font-size:11px;font-weight:bold;margin-top:5px;'>⚠️ APP GATE CLOSED</div>
+            <div class='app-warn'>⚠️ APP GATE CLOSED</div>
         </div>
         <div class="card">
             <h2 style="color:#00AEEF">Schoology</h2>
             <div class="bar"><div style="width:0%;background:#00AEEF"></div></div>
             <div class="stats">0%</div>
             <p><b>0</b> / 35 Districts</p>
-            <div style='color:#d93025;font-size:11px;font-weight:bold;margin-top:5px;'>⚠️ APP GATE CLOSED</div>
+            <div class='app-warn'>⚠️ APP GATE CLOSED</div>
         </div></div>
     
         <details>
@@ -60,10 +67,15 @@
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
                     <tbody>
             <tr>
-                <td>Abby Kelley Foster Charter Public School</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Abby Kelley Foster Charter Public School</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5e715f93d5a83b00015b71d7');alert('ID Copied!');">ID: 5e715f93d5a83b00015b71d7</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Becky George</td>
                 <td class="app-cell">None</td>
@@ -71,7 +83,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Bergenfield School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Bergenfield School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('585048436b6b5e000184abeb');alert('ID Copied!');">ID: 585048436b6b5e000184abeb</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -79,7 +96,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Berkeley Heights Public School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Berkeley Heights Public School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('582b26e00fc76a0100000316');alert('ID Copied!');">ID: 582b26e00fc76a0100000316</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -87,7 +109,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Boston Renaissance Charter Sch</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Boston Renaissance Charter Sch</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5c34b67d66215e00011274fa');alert('ID Copied!');">ID: 5c34b67d66215e00011274fa</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -95,7 +122,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Central Valley School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Central Valley School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('570ccae0dbfe7d01000001a4');alert('ID Copied!');">ID: 570ccae0dbfe7d01000001a4</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Becky George</td>
                 <td class="app-cell">BrainPOP</td>
@@ -103,7 +135,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Elementary School District 159</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Elementary School District 159</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b6b14cbd970c3000121c496');alert('ID Copied!');">ID: 5b6b14cbd970c3000121c496</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -111,7 +148,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Enid School District I-57</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Enid School District I-57</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('566eeec683ce280100000291');alert('ID Copied!');">ID: 566eeec683ce280100000291</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -119,7 +161,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Frost Ind School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Frost Ind School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5f19d6896aa24a0001b2a93d');alert('ID Copied!');">ID: 5f19d6896aa24a0001b2a93d</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -127,7 +174,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Guthrie School District I-01</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Guthrie School District I-01</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5ed675acb5be080001b9fbfb');alert('ID Copied!');">ID: 5ed675acb5be080001b9fbfb</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -135,7 +187,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Hanover Twp Public Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Hanover Twp Public Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b2d6c79d7eb980001e444f8');alert('ID Copied!');">ID: 5b2d6c79d7eb980001e444f8</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -143,7 +200,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Haslett Public School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Haslett Public School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5c995c2d1510850001375fed');alert('ID Copied!');">ID: 5c995c2d1510850001375fed</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -151,7 +213,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Lawton Independent School District 8</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Lawton Independent School District 8</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55b8ed512dfe310100001376');alert('ID Copied!');">ID: 55b8ed512dfe310100001376</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">My Ada Math</td>
@@ -159,7 +226,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Leaders Preparatory School</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Leaders Preparatory School</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('57ec24576d96fb0100000b30');alert('ID Copied!');">ID: 57ec24576d96fb0100000b30</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -167,7 +239,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Maricopa Unified School District 20</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Maricopa Unified School District 20</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('588f83c7e191da00014dac7b');alert('ID Copied!');">ID: 588f83c7e191da00014dac7b</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">My Ada Math</td>
@@ -175,7 +252,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Marion County School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Marion County School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5786c4dc78ef4c0100000758');alert('ID Copied!');">ID: 5786c4dc78ef4c0100000758</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Becky George</td>
                 <td class="app-cell">None</td>
@@ -183,7 +265,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Monmouth-Roseville CUSD 238</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Monmouth-Roseville CUSD 238</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('54d3e3a60d98d20100000003');alert('ID Copied!');">ID: 54d3e3a60d98d20100000003</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -191,7 +278,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Morris Elementary School District 54</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Morris Elementary School District 54</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55f0508f42e7e9010000323d');alert('ID Copied!');">ID: 55f0508f42e7e9010000323d</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -199,7 +291,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Nauset Public Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Nauset Public Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5f343090a5122c00012fd7ac');alert('ID Copied!');">ID: 5f343090a5122c00012fd7ac</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -207,7 +304,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>New Prague Area Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">New Prague Area Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('52a9ce583aa89c9f0b001459');alert('ID Copied!');">ID: 52a9ce583aa89c9f0b001459</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -215,7 +317,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>New Ulm Public School District 88</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">New Ulm Public School District 88</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('53bec0ab27e09eea30000004');alert('ID Copied!');">ID: 53bec0ab27e09eea30000004</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -223,7 +330,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Oklahoma Union Public Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Oklahoma Union Public Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('6329a4e06fc4a6f38e567a95');alert('ID Copied!');">ID: 6329a4e06fc4a6f38e567a95</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -231,7 +343,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Oologah Talala School District 4</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Oologah Talala School District 4</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55d78fa9d5d0860100002325');alert('ID Copied!');">ID: 55d78fa9d5d0860100002325</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Becky George</td>
                 <td class="app-cell">My Ada Math</td>
@@ -239,7 +356,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Parma City School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Parma City School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5995c8cd835c390001d1c5c0');alert('ID Copied!');">ID: 5995c8cd835c390001d1c5c0</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">None</td>
@@ -247,7 +369,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Prairie View USD</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Prairie View USD</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('66a911dc937c9ba03035f871');alert('ID Copied!');">ID: 66a911dc937c9ba03035f871</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -255,7 +382,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Pueblo School for Arts and Sciences</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Pueblo School for Arts and Sciences</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('59a5e029e5b3e100014769cf');alert('ID Copied!');">ID: 59a5e029e5b3e100014769cf</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -263,7 +395,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Reed-Custer Community Unit School District 255-U</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Reed-Custer Community Unit School District 255-U</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('583c88f495061200010fd094');alert('ID Copied!');">ID: 583c88f495061200010fd094</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -271,7 +408,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>School District Of Belleville</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">School District Of Belleville</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55d622a13a34fd010000204a');alert('ID Copied!');">ID: 55d622a13a34fd010000204a</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -279,7 +421,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>The American School Foundation MX</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">The American School Foundation MX</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('61111e1f9ebd3556c183bc2f');alert('ID Copied!');">ID: 61111e1f9ebd3556c183bc2f</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -287,7 +434,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Triton Regional School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Triton Regional School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('58ee6025002ec60001e9c50c');alert('ID Copied!');">ID: 58ee6025002ec60001e9c50c</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -295,7 +447,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Verona School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Verona School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5c773873247142000127960e');alert('ID Copied!');">ID: 5c773873247142000127960e</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -303,7 +460,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>West Hardin Co Cons Sch Dist</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">West Hardin Co Cons Sch Dist</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5e8ea92cf861970001c29c15');alert('ID Copied!');">ID: 5e8ea92cf861970001c29c15</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -311,7 +473,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Wharton School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Wharton School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('66b27a9a57cf48e2bf4d9020');alert('ID Copied!');">ID: 66b27a9a57cf48e2bf4d9020</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -319,7 +486,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Wood Dale School District 7</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Wood Dale School District 7</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5852a7fc54c28300012bfac0');alert('ID Copied!');">ID: 5852a7fc54c28300012bfac0</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -327,7 +499,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Woodcliff Lake School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Woodcliff Lake School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('6312537d628ffb9248fe334c');alert('ID Copied!');">ID: 6312537d628ffb9248fe334c</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -335,7 +512,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Worcester Public School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Worcester Public School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('59fa179071948900019f3311');alert('ID Copied!');">ID: 59fa179071948900019f3311</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Tashi Bordenave</td>
                 <td class="app-cell">None</td>
@@ -352,10 +534,15 @@
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
                     <tbody>
             <tr>
-                <td>Anderson Community School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Anderson Community School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55d2362a7bb201010000a682');alert('ID Copied!');">ID: 55d2362a7bb201010000a682</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -363,7 +550,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Basehor-Linwood USD 458</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Basehor-Linwood USD 458</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b15680c3cd4bf000125cfe0');alert('ID Copied!');">ID: 5b15680c3cd4bf000125cfe0</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -371,7 +563,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Bayaan Academy</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Bayaan Academy</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('653fafedebeb02304205f63e');alert('ID Copied!');">ID: 653fafedebeb02304205f63e</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -379,7 +576,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Bixby Public Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Bixby Public Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('528b8974d7f9abc70b000072');alert('ID Copied!');">ID: 528b8974d7f9abc70b000072</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">My Ada Math</td>
@@ -387,7 +589,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Broken Arrow School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Broken Arrow School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5bd73a5bfb184b0001f6ed90');alert('ID Copied!');">ID: 5bd73a5bfb184b0001f6ed90</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Danielle Windley</td>
                 <td class="app-cell">My Ada Math</td>
@@ -395,7 +602,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Camden County Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Camden County Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('62fbb65f47715c3034b2071d');alert('ID Copied!');">ID: 62fbb65f47715c3034b2071d</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -403,7 +615,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Charles City County School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Charles City County School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('569e2492be19c70100000370');alert('ID Copied!');">ID: 569e2492be19c70100000370</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -411,7 +628,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Columbus City School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Columbus City School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5421ac510ade5b9d3c000826');alert('ID Copied!');">ID: 5421ac510ade5b9d3c000826</span>
+                    </div>
+                </td>
                 <td>Big District</td>
                 <td>Talia Stryker</td>
                 <td class="app-cell">None</td>
@@ -419,7 +641,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Coweta Charter Academy</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Coweta Charter Academy</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('667061f223de614259aea3e5');alert('ID Copied!');">ID: 667061f223de614259aea3e5</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -427,7 +654,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Edmonds School District #15</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Edmonds School District #15</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('521e6e08f2e8ea1248000054');alert('ID Copied!');">ID: 521e6e08f2e8ea1248000054</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>VeCartier Johnson</td>
                 <td class="app-cell">My Ada Math</td>
@@ -435,7 +667,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Freedom Prep Academy</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Freedom Prep Academy</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5d939cfa13d20a0001d2f606');alert('ID Copied!');">ID: 5d939cfa13d20a0001d2f606</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -443,7 +680,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Georgia Cyber Academy</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Georgia Cyber Academy</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('59b021032ec0080001aee71c');alert('ID Copied!');">ID: 59b021032ec0080001aee71c</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">Khan Academy, Smart Science Education</td>
@@ -451,7 +693,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Iowa City Community School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Iowa City Community School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5994a7a03086ce000127cb47');alert('ID Copied!');">ID: 5994a7a03086ce000127cb47</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Tashi Bordenave</td>
                 <td class="app-cell">Khan Academy</td>
@@ -459,7 +706,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Jenks School District 5</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Jenks School District 5</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('58d2bdbc13a0110001400ab7');alert('ID Copied!');">ID: 58d2bdbc13a0110001400ab7</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">My Ada Math</td>
@@ -467,7 +719,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Keystone School</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Keystone School</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('590b52b1c6872d00010c9a0a');alert('ID Copied!');">ID: 590b52b1c6872d00010c9a0a</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -475,7 +732,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Lauderdale County School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Lauderdale County School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('571fb247d81c8501000008d0');alert('ID Copied!');">ID: 571fb247d81c8501000008d0</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -483,7 +745,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Liberty 53 School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Liberty 53 School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b2942aa709e300001e2cd70');alert('ID Copied!');">ID: 5b2942aa709e300001e2cd70</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">My Ada Math</td>
@@ -491,7 +758,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Meridian Technology Center</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Meridian Technology Center</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('66a1599325ec771f84316407');alert('ID Copied!');">ID: 66a1599325ec771f84316407</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -499,7 +771,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Moore School District I-2</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Moore School District I-2</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5aea0241687cd90001b9bbbb');alert('ID Copied!');">ID: 5aea0241687cd90001b9bbbb</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Emily Bleibel</td>
                 <td class="app-cell">BrainPOP, My Ada Math</td>
@@ -507,7 +784,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>National Education Equity Lab</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">National Education Equity Lab</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('687002328d5b953d639f3fc8');alert('ID Copied!');">ID: 687002328d5b953d639f3fc8</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">Khan Academy</td>
@@ -515,7 +797,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Norman Independent School District 29</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Norman Independent School District 29</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5568958c6392110100000248');alert('ID Copied!');">ID: 5568958c6392110100000248</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Danielle Windley</td>
                 <td class="app-cell">My Ada Math</td>
@@ -523,7 +810,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Oak Ridge School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Oak Ridge School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5576e45e4b17280100000049');alert('ID Copied!');">ID: 5576e45e4b17280100000049</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -531,7 +823,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Pattonville School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Pattonville School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5212608a7a69cd89450051d2');alert('ID Copied!');">ID: 5212608a7a69cd89450051d2</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -539,7 +836,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Piedmont Classical High School</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Piedmont Classical High School</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('62e02c37c8953c0d0adac902');alert('ID Copied!');">ID: 62e02c37c8953c0d0adac902</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -547,7 +849,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Premier Prep Online Academy</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Premier Prep Online Academy</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('64373ee71d94bf961e1c8690');alert('ID Copied!');">ID: 64373ee71d94bf961e1c8690</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -555,7 +862,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Sage Oak Charter Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Sage Oak Charter Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5ed51fe938841e00017da8a0');alert('ID Copied!');">ID: 5ed51fe938841e00017da8a0</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Becky George</td>
                 <td class="app-cell">None</td>
@@ -563,7 +875,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Summit Christian Academy</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Summit Christian Academy</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5f2c7f96fd700c00010f954b');alert('ID Copied!');">ID: 5f2c7f96fd700c00010f954b</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Becky George</td>
                 <td class="app-cell">My Ada Math</td>
@@ -571,7 +888,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Sycamore Community Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Sycamore Community Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('57179f2cd81c8501000005d5');alert('ID Copied!');">ID: 57179f2cd81c8501000005d5</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -579,7 +901,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Union Pub School District I-9</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Union Pub School District I-9</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b590e696521dc0001dc5b83');alert('ID Copied!');">ID: 5b590e696521dc0001dc5b83</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Emily Bleibel</td>
                 <td class="app-cell">My Ada Math</td>
@@ -587,7 +914,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Woodford County School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Woodford County School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('57a09663def8410100000091');alert('ID Copied!');">ID: 57a09663def8410100000091</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -595,7 +927,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>York County School Division</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">York County School Division</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('51a8f09d53fbaab560001243');alert('ID Copied!');">ID: 51a8f09d53fbaab560001243</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">BrainPOP</td>
@@ -612,10 +949,15 @@
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
                     <tbody>
             <tr>
-                <td>Albert Einstein Academies</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Albert Einstein Academies</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('59a829bf6b849400011f6073');alert('ID Copied!');">ID: 59a829bf6b849400011f6073</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -623,7 +965,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Aloha Academy</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Aloha Academy</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('66fd7fdf994beb2d2019921b');alert('ID Copied!');">ID: 66fd7fdf994beb2d2019921b</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -631,7 +978,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Auburn City School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Auburn City School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('59cea8e214710700018a0156');alert('ID Copied!');">ID: 59cea8e214710700018a0156</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">BrainPOP</td>
@@ -639,7 +991,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>CHP Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">CHP Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('596d785cd5bdcc00012c5f2c');alert('ID Copied!');">ID: 596d785cd5bdcc00012c5f2c</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -647,7 +1004,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Caroline County Public Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Caroline County Public Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5421c85e0cee6bb03b001934');alert('ID Copied!');">ID: 5421c85e0cee6bb03b001934</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -655,7 +1017,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Chickasaw City School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Chickasaw City School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b7b5068ac16750001c6e78c');alert('ID Copied!');">ID: 5b7b5068ac16750001c6e78c</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -663,7 +1030,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Columbus Municipal School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Columbus Municipal School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55c3b4e9177e760100002bbb');alert('ID Copied!');">ID: 55c3b4e9177e760100002bbb</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -671,7 +1043,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Conestoga Valley School Dist</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Conestoga Valley School Dist</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5ec5fd0a12b9180001a4c762');alert('ID Copied!');">ID: 5ec5fd0a12b9180001a4c762</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -679,7 +1056,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Crosby Independent School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Crosby Independent School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5671a4ed1e5f2a01000003ad');alert('ID Copied!');">ID: 5671a4ed1e5f2a01000003ad</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">Progress Learning</td>
@@ -687,7 +1069,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Eden Prairie Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Eden Prairie Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('595d39efbd6df400015af13b');alert('ID Copied!');">ID: 595d39efbd6df400015af13b</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Abby Ali</td>
                 <td class="app-cell">None</td>
@@ -695,7 +1082,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Elk River Area School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Elk River Area School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5245e2c552f6c40c0c000002');alert('ID Copied!');">ID: 5245e2c552f6c40c0c000002</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Emily Bleibel</td>
                 <td class="app-cell">My Ada Math</td>
@@ -703,7 +1095,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Exeter Township School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Exeter Township School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('537f4b66193b06581c0001a9');alert('ID Copied!');">ID: 537f4b66193b06581c0001a9</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -711,7 +1108,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Harmony Public Schools x Progress Learning</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Harmony Public Schools x Progress Learning</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('69af3a0c6b83b00f04820da1');alert('ID Copied!');">ID: 69af3a0c6b83b00f04820da1</span>
+                    </div>
+                </td>
                 <td>AnySchool District/ Big District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">Progress Learning</td>
@@ -719,7 +1121,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Jim Thorpe Area School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Jim Thorpe Area School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5942875f74cb2e000143dfd2');alert('ID Copied!');">ID: 5942875f74cb2e000143dfd2</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -727,7 +1134,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Kanawha Co School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Kanawha Co School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5a8de615741d58000160902b');alert('ID Copied!');">ID: 5a8de615741d58000160902b</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Tashi Bordenave</td>
                 <td class="app-cell">No app</td>
@@ -735,7 +1147,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Limestone County School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Limestone County School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('57f7cf81a288860100000352');alert('ID Copied!');">ID: 57f7cf81a288860100000352</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -743,7 +1160,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>McAlester School District I-80</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">McAlester School District I-80</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b855c00ac16750001c6e7d2');alert('ID Copied!');">ID: 5b855c00ac16750001c6e7d2</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -751,7 +1173,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Miami Christian School</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Miami Christian School</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('607579fe01dcadb42ebd914f');alert('ID Copied!');">ID: 607579fe01dcadb42ebd914f</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -759,7 +1186,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Montgomery Public Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Montgomery Public Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('599f1dc5a5551900014b1847');alert('ID Copied!');">ID: 599f1dc5a5551900014b1847</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Danielle Windley</td>
                 <td class="app-cell">Progress Learning</td>
@@ -767,7 +1199,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Mountain View School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Mountain View School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55e734ce8b848801000010a5');alert('ID Copied!');">ID: 55e734ce8b848801000010a5</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -775,7 +1212,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Port Arthur Ind School Dist</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Port Arthur Ind School Dist</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('61365fc56f7c91e8d64fea8d');alert('ID Copied!');">ID: 61365fc56f7c91e8d64fea8d</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP, Progress Learning</td>
@@ -783,7 +1225,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Putnam County Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Putnam County Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5cb113cae04b970001f9fc18');alert('ID Copied!');">ID: 5cb113cae04b970001f9fc18</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Emily Bleibel</td>
                 <td class="app-cell">My Ada Math</td>
@@ -791,7 +1238,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>REAP International K12 Schools</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">REAP International K12 Schools</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('68220819280aa87e94eb0de2');alert('ID Copied!');">ID: 68220819280aa87e94eb0de2</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">Smart Science</td>
@@ -799,7 +1251,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>School Administrative Unit 19</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">School Administrative Unit 19</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('570e9635d81c8501000002a8');alert('ID Copied!');">ID: 570e9635d81c8501000002a8</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -807,7 +1264,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>School Administrative Unit 70</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">School Administrative Unit 70</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('62f580b382744cd801d36923');alert('ID Copied!');">ID: 62f580b382744cd801d36923</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -815,7 +1277,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Skokie School District 69</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Skokie School District 69</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5f28cff6a74cae000142411f');alert('ID Copied!');">ID: 5f28cff6a74cae000142411f</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Becky George</td>
                 <td class="app-cell">My Ada Math</td>
@@ -823,7 +1290,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>South Washington County School District 833</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">South Washington County School District 833</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('58dd680da16b3d00016e83f2');alert('ID Copied!');">ID: 58dd680da16b3d00016e83f2</span>
+                    </div>
+                </td>
                 <td>Mid District</td>
                 <td>Emily Bleibel</td>
                 <td class="app-cell">My Ada Math</td>
@@ -831,7 +1303,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Southgate Community School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Southgate Community School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5875094fc11d8000019184d2');alert('ID Copied!');">ID: 5875094fc11d8000019184d2</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -839,7 +1316,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>St John's Jesuit High School</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">St John's Jesuit High School</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5f46c0d3bc17ae00011cf871');alert('ID Copied!');">ID: 5f46c0d3bc17ae00011cf871</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -847,7 +1329,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Stevens Point Area Public School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Stevens Point Area Public School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('563cdcd905d2fd0100000126');alert('ID Copied!');">ID: 563cdcd905d2fd0100000126</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -855,7 +1342,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Telluride School District R-1</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Telluride School District R-1</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5b7c9e78a47b2e0001fba6bc');alert('ID Copied!');">ID: 5b7c9e78a47b2e0001fba6bc</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">BrainPOP</td>
@@ -863,7 +1355,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Union City Community School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Union City Community School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('55c54084b2d9a90100001b88');alert('ID Copied!');">ID: 55c54084b2d9a90100001b88</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -871,7 +1368,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Weatherford School Dist 26</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Weatherford School Dist 26</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('624350ae800fb93c79dd43e2');alert('ID Copied!');">ID: 624350ae800fb93c79dd43e2</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -879,7 +1381,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>West Side Christian School</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">West Side Christian School</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5fb5a7435cdd6f95de9b2135');alert('ID Copied!');">ID: 5fb5a7435cdd6f95de9b2135</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">My Ada Math</td>
@@ -887,7 +1394,12 @@
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
-                <td>Windham School District</td>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">Windham School District</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('5911d40018258a00010f4033');alert('ID Copied!');">ID: 5911d40018258a00010f4033</span>
+                    </div>
+                </td>
                 <td>Scaled District</td>
                 <td>Clever Admin</td>
                 <td class="app-cell">None</td>
@@ -897,6 +1409,6 @@
                 </table>
             </div>
         </details>
-    <div class="ts">Last Sync: Apr 29, 2026 at 12:19 PM (PT)</div>
+    <div class="ts">Last Sync: Apr 29, 2026 at 01:42 PM (PT)</div>
 </body>
 </html>
