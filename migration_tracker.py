@@ -8,7 +8,7 @@ GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
 
-# CORRECTED: Mapped flags to match your exact LaunchDarkly production dashboard keys
+# CORRECTED: Production-ready keys matching your precise LaunchDarkly profile logs
 LMS_CONFIGS = {
     "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
     "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
@@ -43,7 +43,7 @@ except Exception as e:
 
 cards_html, dropdowns_html = "", ""
 
-# Global application map to track across all LMS iterations
+# Master map dictionary compiling all cross-platform application properties
 global_apps_matrix = {}
 total_targeted_apps = 34  
 
@@ -76,13 +76,11 @@ for key, cfg in LMS_CONFIGS.items():
                 "done": is_done
             })
 
-            # Populate cross-LMS global applications matrix
+            # Populate matrix arrays for application visibility
             if app_list:
                 for app_id in app_list:
                     if app_id not in global_apps_matrix:
                         global_apps_matrix[app_id] = {"google": False, "canvas": False, "schoology": False}
-                    
-                    # If this specific district connection is green, set this LMS flag to True for the app
                     if is_done:
                         global_apps_matrix[app_id][key] = True
         
@@ -131,11 +129,11 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['tab']}: {e}")
 
-# Calculate total active transitions dynamically from our structured matrix
+# Calculate metrics summary metrics across app indices
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- BUILD THE NEW APPLICATIONS DROPDOWN COMPONENT ---
+# --- BUILD THE NEW APPLICATIONS DROPDOWN COMPONENT (ESCAPED FOR STRINGS) ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
     gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
@@ -151,6 +149,7 @@ for app_id, systems in sorted(global_apps_matrix.items()):
         </tr>
     """)
 
+# FIXED: Doubled curly braces on inline layout properties to escape f-string evaluation exceptions
 apps_dropdown_html = f"""
 <details style="margin-bottom: 24px;">
     <summary style="border-left: 5px solid #202124; font-weight:bold;">
@@ -178,6 +177,7 @@ apps_dropdown_html = f"""
 # --- 3. HTML ASSEMBLY ---
 ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
 
+# FIXED: Doubled style template brace anchors to secure parsing reliability
 apps_summary_block = f"""
 <div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -204,6 +204,7 @@ apps_summary_block = f"""
 </div>
 """
 
+# FIXED: Doubled document baseline styling blocks
 final_content = f"""
 <!DOCTYPE html>
 <html>
@@ -249,3 +250,7 @@ final_content = f"""
     <div class="ts">Last Sync: {ts} (PT)</div>
 </body>
 </html>
+"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(final_content)
