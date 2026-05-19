@@ -3,15 +3,16 @@ from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
 # --- 1. CONFIGURATION ---
-LD_TOKEN = sys.argv if len(sys.argv) > 1 else "" 
+LD_TOKEN = sys.argv[1] if len(sys.argv) > 1 else "" 
 GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
 
+# CORRECTED: Mapped flags to match your exact LaunchDarkly production dashboard keys
 LMS_CONFIGS = {
     "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
-    "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-canvas-migration", "color": "#E13939", "title": "Canvas"},
-    "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-schoology-migration", "color": "#00AEEF", "title": "Schoology"}
+    "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
+    "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
 }
 
 def get_ld(flag):
@@ -42,10 +43,9 @@ except Exception as e:
 
 cards_html, dropdowns_html = "", ""
 
-# Initialize global application-level metrics trackers across all tabs
+# Global application map to track across all LMS iterations
+global_apps_matrix = {}
 total_targeted_apps = 34  
-live_prod_apps_count = 0
-seen_app_ids = set()
 
 for key, cfg in LMS_CONFIGS.items():
     try:
@@ -76,14 +76,15 @@ for key, cfg in LMS_CONFIGS.items():
                 "done": is_done
             })
 
-            # --- DYNAMIC APP COUNTING (IN-LOOP TO PREVENT OVERWRITES) ---
+            # Populate cross-LMS global applications matrix
             if app_list:
                 for app_id in app_list:
-                    if app_id not in seen_app_ids:
-                        seen_app_ids.add(app_id)
-                        # If the district connection handshake is active, count the app as Live in Production
-                        if is_done:
-                            live_prod_apps_count += 1
+                    if app_id not in global_apps_matrix:
+                        global_apps_matrix[app_id] = {"google": False, "canvas": False, "schoology": False}
+                    
+                    # If this specific district connection is green, set this LMS flag to True for the app
+                    if is_done:
+                        global_apps_matrix[app_id][key] = True
         
         done_count = sum(1 for d in districts_data if d['done'])
         total = len(districts_data)
@@ -130,13 +131,53 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['tab']}: {e}")
 
-# Safely calculate progress percentage metric ratio
+# Calculate total active transitions dynamically from our structured matrix
+live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
+
+# --- BUILD THE NEW APPLICATIONS DROPDOWN COMPONENT ---
+apps_matrix_rows = []
+for app_id, systems in sorted(global_apps_matrix.items()):
+    gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
+    canvas_status = '<span class="ok">✅ Active</span>' if systems['canvas'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
+    schoology_status = '<span class="ok">✅ Active</span>' if systems['schoology'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
+    
+    apps_matrix_rows.append(f"""
+        <tr>
+            <td style="font-family:monospace; font-weight:600; padding:12px; border-bottom:1px solid #f1f3f4;">{app_id}</td>
+            <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{gc_status}</td>
+            <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{canvas_status}</td>
+            <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
+        </tr>
+    """)
+
+apps_dropdown_html = f"""
+<details style="margin-bottom: 24px;">
+    <summary style="border-left: 5px solid #202124; font-weight:bold;">
+        <span>📦 Partner Application-Side LMS Matrix</span>
+        <span class="sum-count">{live_prod_apps_count} / {total_targeted_apps} Enabled</span>
+    </summary>
+    <div class="table-wrap" style="padding:20px;">
+        <table style="width:100%; border-collapse:collapse; background:white;">
+            <thead>
+                <tr style="background:#f8f9fa;">
+                    <th style="padding:12px; text-align:left;">Application ID</th>
+                    <th style="padding:12px; text-align:center;">Google Classroom Status</th>
+                    <th style="padding:12px; text-align:center;">Canvas Status</th>
+                    <th style="padding:12px; text-align:center;">Schoology Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {"".join(apps_matrix_rows) if apps_matrix_rows else '<tr><td colspan="4" style="text-align:center; padding:20px;">No applications parsed.</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+</details>
+"""
 
 # --- 3. HTML ASSEMBLY ---
 ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
 
-# New application overview dashboard block asset
 apps_summary_block = f"""
 <div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -202,12 +243,9 @@ final_content = f"""
 <body>
     <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
     {apps_summary_block}
+    {apps_dropdown_html}
     <div class="container">{cards_html}</div>
     {dropdowns_html}
     <div class="ts">Last Sync: {ts} (PT)</div>
 </body>
 </html>
-"""
-
-with open("index.html", "w", encoding="utf-8") as f:
-    f.write(final_content)
