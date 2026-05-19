@@ -3,7 +3,7 @@ from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
 # --- 1. CONFIGURATION ---
-LD_TOKEN = sys.argv if len(sys.argv) > 1 else "" # Fix for token indexing
+LD_TOKEN = sys.argv if len(sys.argv) > 1 else "" 
 GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
@@ -42,6 +42,11 @@ except Exception as e:
 
 cards_html, dropdowns_html = "", ""
 
+# Initialize global application-level metrics trackers across all tabs
+total_targeted_apps = 34  
+live_prod_apps_count = 0
+seen_app_ids = set()
+
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['tab']).get_all_records()
@@ -51,7 +56,6 @@ for key, cfg in LMS_CONFIGS.items():
         districts_data = []
         for r in rows:
             rid = str(r.get('District Id', '')).strip()
-            # Standardize prefix for matching
             pre = f"district:{rid}" if rid and not rid.startswith("district:") else rid
             
             raw_apps = str(r.get('Connected Apps', '')).strip()
@@ -63,7 +67,7 @@ for key, cfg in LMS_CONFIGS.items():
             
             is_done = pre in ld_ids and apps_ok
             districts_data.append({
-                "id": rid, # NEW: Storing the raw ID
+                "id": rid, 
                 "name": r.get('District Name', rid), 
                 "segment": r.get('Segment', 'N/A'), 
                 "csm": r.get('CSM Name', 'N/A'), 
@@ -71,6 +75,15 @@ for key, cfg in LMS_CONFIGS.items():
                 "bts": bts_date,
                 "done": is_done
             })
+
+            # --- DYNAMIC APP COUNTING (IN-LOOP TO PREVENT OVERWRITES) ---
+            if app_list:
+                for app_id in app_list:
+                    if app_id not in seen_app_ids:
+                        seen_app_ids.add(app_id)
+                        # If the district connection handshake is active, count the app as Live in Production
+                        if is_done:
+                            live_prod_apps_count += 1
         
         done_count = sum(1 for d in districts_data if d['done'])
         total = len(districts_data)
@@ -117,31 +130,38 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['tab']}: {e}")
 
-# --- APPLICATION TRANSITION METRICS CALCULATION (ROBUST VERSION) ---
-total_targeted_apps = 34  
-live_prod_apps_count = 0
-seen_app_ids = set()
-
-# Safe fallback check: verify if our main app loop object parameters are initialized
-if 'dropdowns_html' in locals() or 'rows_html' in locals():
-    # Loop over your script's native districts data wrapper object
-    for d in districts_data if 'districts_data' in locals() else []:
-        # Use .get() defensively to completely prevent KeyError failures on blank fields
-        app_field = d.get('apps')
-        if app_field:
-            row_app_ids = [a.strip() for a in str(app_field).split(',') if a.strip()]
-            for app_id in row_app_ids:
-                if app_id not in seen_app_ids:
-                    seen_app_ids.add(app_id)
-                    # Check if the district row is marked Done or complete
-                    if d.get('done') == 'Done' or d.get('done') is True:
-                        live_prod_apps_count += 1
-
-# Safely calculate the progress percentage ratio
+# Safely calculate progress percentage metric ratio
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
 # --- 3. HTML ASSEMBLY ---
 ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
+
+# New application overview dashboard block asset
+apps_summary_block = f"""
+<div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">Partner Applications Migration Status</h2>
+            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks migration validation states across individual developer app environment allocations.</p>
+        </div>
+        <div style="display: flex; gap: 40px; align-items: center;">
+            <div style="text-align: center;">
+                <span style="display: block; font-size: 2rem; font-weight: 700; color: #10b981;">{live_prod_apps_count}</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Live Prod Apps</span>
+            </div>
+            <div style="border-left: 1px solid #e2e8f0; height: 40px;"></div>
+            <div style="text-align: center;">
+                <span style="display: block; font-size: 2rem; font-weight: 700; color: #64748b;">{total_targeted_apps}</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Total Targeted Pool</span>
+            </div>
+            <div style="border-left: 1px solid #e2e8f0; height: 40px;"></div>
+            <div style="background: #ecfdf5; color: #065f46; padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 1.1rem;">
+                {app_progress_pct}% Complete
+            </div>
+        </div>
+    </div>
+</div>
+"""
 
 final_content = f"""
 <!DOCTYPE html>
@@ -167,7 +187,6 @@ final_content = f"""
         th, td {{ padding: 12px 10px; border-bottom: 1px solid #f1f3f4; vertical-align: top; }}
         th {{ color: #5f6368; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }}
         
-        /* District ID Styling */
         .district-info {{ display: flex; flex-direction: column; gap: 4px; }}
         .d-name {{ font-weight: 600; color: #202124; }}
         .d-id {{ font-family: monospace; font-size: 0.8em; color: #9aa0a6; cursor: pointer; display: inline-block; }}
@@ -182,6 +201,7 @@ final_content = f"""
 </head>
 <body>
     <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
+    {apps_summary_block}
     <div class="container">{cards_html}</div>
     {dropdowns_html}
     <div class="ts">Last Sync: {ts} (PT)</div>
