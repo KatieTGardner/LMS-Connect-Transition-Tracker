@@ -3,12 +3,12 @@ from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
 # --- 1. CONFIGURATION ---
-LD_TOKEN = sys.argv[1] if len(sys.argv) > 1 else "" 
+LD_TOKEN = sys.argv if len(sys.argv) > 1 else "" 
 GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
 
-# CORRECTED: Production-ready keys matching your precise LaunchDarkly profile logs
+# Production feature flag names matched to your exact LaunchDarkly environment profile
 LMS_CONFIGS = {
     "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
     "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
@@ -42,37 +42,27 @@ except Exception as e:
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
-
-# Master map dictionary compiling all cross-platform application properties
 global_apps_matrix = {}
+app_name_map = {}
 total_targeted_apps = 34  
 
+# Loop 1: Pre-populate app configuration statuses straight from LaunchDarkly API states
+for key, cfg in LMS_CONFIGS.items():
+    ld_ids = get_ld(cfg['flag'])
+    for target_id in ld_ids:
+        if target_id.startswith("app:"):
+            clean_id = target_id.replace("app:", "").strip()
+            if clean_id not in global_apps_matrix:
+                global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
+            global_apps_matrix[clean_id][key] = True
+
+# Loop 2: Process spreadsheets and build the layout roster records
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['tab']).get_all_records()
         ld_ids = get_ld(cfg['flag'])
         apps_ok = any(i.startswith("app:") for i in ld_ids)
-       
-# --- IMPROVED DATA COMPILATION & DISCOVERY ---
-global_apps_matrix = {}
-app_name_map = {} # Maps Hex IDs to Friendly Names from the spreadsheet
-
-for key, cfg in LMS_CONFIGS.items():
-    try:
-        rows = doc.worksheet(cfg['tab']).get_all_records()
-        ld_ids = get_ld(cfg['flag']) # Active IDs fetched directly from LaunchDarkly
-        apps_ok = any(i.startswith("app:") for i in ld_ids)
         
-        # 1. Discover App IDs directly from the LaunchDarkly flag targets first!
-        for target_id in ld_ids:
-            if target_id.startswith("app:"):
-                clean_app_id = target_id.replace("app:", "").strip()
-                if clean_app_id not in global_apps_matrix:
-                    global_apps_matrix[clean_app_id] = {"google": False, "canvas": False, "schoology": False}
-                # If it's targeted in the flag, mark it as True for this LMS immediately!
-                global_apps_matrix[clean_app_id][key] = True
-
-        # 2. Parse spreadsheet to build the names map and handle district rows
         districts_data = []
         for r in rows:
             rid = str(r.get('District Id', '')).strip()
@@ -81,20 +71,21 @@ for key, cfg in LMS_CONFIGS.items():
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
-            
-            # Match friendly names to Hex IDs if available in the tracking sheets
-            # Assumes format "My Ada Math (64cbff9e498f330001ce6412)" or matches clean IDs
+
+            # Parse out names mapping profiles for display fields
             for app in app_list:
                 if "(" in app and ")" in app:
                     name_part = app.split('(').strip()
                     id_part = app.split('(').replace(')', '').strip()
                     app_name_map[id_part] = name_part
-                elif len(app) == 24: # Direct hex identifier string length
-                    app_name_map[app] = r.get('District Name', app) if "Math" in r.get('District Name','') else app
+                elif len(app) == 24:
+                    # Fallback configuration to capture direct ID tokens if string matches length
+                    app_name_map[app] = app
 
             bts_date = str(r.get('BTS Dates', 'TBD')).strip()
-            is_done = pre in ld_ids and apps_ok
+            if not bts_date: bts_date = "TBD"
             
+            is_done = pre in ld_ids and apps_ok
             districts_data.append({
                 "id": rid, 
                 "name": r.get('District Name', rid), 
@@ -104,8 +95,20 @@ for key, cfg in LMS_CONFIGS.items():
                 "bts": bts_date,
                 "done": is_done
             })
-
-        # Keep existing cards_html and rows_html assembly here...
+        
+        done_count = sum(1 for d in districts_data if d['done'])
+        total = len(districts_data)
+        pct = int((done_count/total)*100) if total > 0 else 0
+        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
+        
+        cards_html += f"""
+        <div class="card">
+            <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
+            <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
+            <div class="stats">{pct}%</div>
+            <p><b>{done_count}</b> / {total} Districts</p>
+            {warn}
+        </div>"""
         
         rows_html = "".join([f"""
             <tr>
@@ -138,14 +141,13 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['tab']}: {e}")
 
-# Calculate metrics summary metrics across app indices
+# Calculate metrics states 
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- BUILD THE NEW APPLICATIONS DROPDOWN COMPONENT ---
+# --- 3. HTML ASSEMBLY (ALL STRINGS SANITIZED & ESCAPED DOWN HERE) ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
-    # Resolve friendly name if discovered in tracking tabs, otherwise display ID string
     display_name = app_name_map.get(app_id, app_id)
     if display_name != app_id:
         display_label = f"{display_name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
@@ -158,69 +160,65 @@ for app_id, systems in sorted(global_apps_matrix.items()):
     
     apps_matrix_rows.append(f"""
         <tr>
-            <td style="font-weight:600; padding:12px; border-bottom:1px solid #f1f3f4; text-align:left;">{display_label}</td>
-            <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{gc_status}</td>
-            <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{canvas_status}</td>
-            <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
+            <td style="text-align:left; padding:12px; border-bottom:1px solid #f1f3f4;">{display_label}</td>
+            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{gc_status}</td>
+            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{canvas_status}</td>
+            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
         </tr>
     """)
 
-# FIXED: Doubled curly braces on inline layout properties to escape f-string evaluation exceptions
 apps_dropdown_html = f"""
-<details style="margin-bottom: 24px;">
-    <summary style="border-left: 5px solid #202124; font-weight:bold;">
-        <span>📦 Partner Application-Side LMS Matrix</span>
+<details style="margin-bottom: 24px; background: white; border-radius: 8px; border: 1px solid #e0e0e0;">
+    <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
+        <span>📦 Partner Application-Side LMS Matrix (Real-Time Flags)</span>
         <span class="sum-count">{live_prod_apps_count} / {total_targeted_apps} Enabled</span>
     </summary>
-    <div class="table-wrap" style="padding:20px;">
-        <table style="width:100%; border-collapse:collapse; background:white;">
+    <div class="table-wrap" style="padding: 0 20px 20px; overflow-x: auto;">
+        <table style="width:100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px;">
             <thead>
-                <tr style="background:#f8f9fa;">
-                    <th style="padding:12px; text-align:left;">Application ID</th>
-                    <th style="padding:12px; text-align:center;">Google Classroom Status</th>
-                    <th style="padding:12px; text-align:center;">Canvas Status</th>
-                    <th style="padding:12px; text-align:center;">Schoology Status</th>
+                <tr style="background:#f1f3f4; color: #5f6368;">
+                    <th style="padding:12px; text-align:left;">Application Profile / ID</th>
+                    <th style="padding:12px; text-align:center;">Google Classroom</th>
+                    <th style="padding:12px; text-align:center;">Canvas</th>
+                    <th style="padding:12px; text-align:center;">Schoology</th>
                 </tr>
             </thead>
             <tbody>
-                {"".join(apps_matrix_rows) if apps_matrix_rows else '<tr><td colspan="4" style="text-align:center; padding:20px;">No applications parsed.</td></tr>'}
+                {"".join(apps_matrix_rows) if apps_matrix_rows else '<tr><td colspan="4" style="text-align:center; padding:20px;">No application feature flags detected.</td></tr>'}
             </tbody>
         </table>
     </div>
 </details>
 """
 
-# --- 3. HTML ASSEMBLY ---
-ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
-
-# FIXED: Doubled style template brace anchors to secure parsing reliability
 apps_summary_block = f"""
-<div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+<div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
             <h2 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">Partner Applications Migration Status</h2>
-            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks migration validation states across individual developer app environment allocations.</p>
+            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks flag readiness rules completely decoupled from live active rosters.</p>
         </div>
         <div style="display: flex; gap: 40px; align-items: center;">
             <div style="text-align: center;">
                 <span style="display: block; font-size: 2rem; font-weight: 700; color: #10b981;">{live_prod_apps_count}</span>
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Live Prod Apps</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Flags Active</span>
             </div>
             <div style="border-left: 1px solid #e2e8f0; height: 40px;"></div>
             <div style="text-align: center;">
                 <span style="display: block; font-size: 2rem; font-weight: 700; color: #64748b;">{total_targeted_apps}</span>
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Total Targeted Pool</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Total Scope</span>
             </div>
             <div style="border-left: 1px solid #e2e8f0; height: 40px;"></div>
             <div style="background: #ecfdf5; color: #065f46; padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 1.1rem;">
-                {app_progress_pct}% Complete
+                {app_progress_pct}% Configured
             </div>
         </div>
     </div>
 </div>
 """
 
-# FIXED: Doubled document baseline styling blocks
+ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
+
 final_content = f"""
 <!DOCTYPE html>
 <html>
