@@ -64,17 +64,18 @@ global_apps_matrix = {}
 app_name_map = {}
 total_targeted_apps = 34  
 
-# Loop 1: Pre-populate app configurations straight from LaunchDarkly API states
+# Loop 1: Query LaunchDarkly API flag states first
 for key, cfg in LMS_CONFIGS.items():
     ld_ids = get_ld(cfg['flag'])
     for target_id in ld_ids:
         if target_id.startswith("app:"):
             clean_id = target_id.replace("app:", "").strip()
+            # DEFENSIVE FIXED PATTERN: Only instantiate if the key does not exist yet!
             if clean_id not in global_apps_matrix:
                 global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[clean_id][key] = True
 
-# Loop 2: NEW! Automatically learn name mappings by reading the dedicated "- Apps" spreadsheet tabs
+# Loop 2: Learn name mappings automatically via the dedicated "- Apps" spreadsheet tabs
 for key, cfg in LMS_CONFIGS.items():
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
@@ -83,10 +84,13 @@ for key, cfg in LMS_CONFIGS.items():
             raw_id = str(row.get('Prod App ID', '')).strip()
             if raw_name and raw_id:
                 app_name_map[raw_id] = raw_name
+                # Ensure all sheet discovered apps are captured in target map structures safely
+                if raw_id not in global_apps_matrix:
+                    global_apps_matrix[raw_id] = {"google": False, "canvas": False, "schoology": False}
     except Exception as e:
         print(f"Notice: Could not parse apps mapping tab {cfg['apps_tab']}: {e}")
 
-# Loop 3: Process district tabs and build layout roster records
+# Loop 3: Process districts data rosters
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['districts_tab']).get_all_records()
@@ -161,7 +165,7 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['districts_tab']}: {e}")
 
-# Calculate metrics states 
+# Calculate active metrics status
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
