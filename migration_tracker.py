@@ -10,9 +10,27 @@ ENV = "production"
 
 # Production feature flag names matched to your exact LaunchDarkly environment profile
 LMS_CONFIGS = {
-    "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
-    "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
-    "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
+    "google": {
+        "districts_tab": "[Data] Google Classroom - Districts", 
+        "apps_tab": "[Data] Google Classroom - Apps",
+        "flag": "lms-connect-google-classroom-mvp", 
+        "color": "#34A853", 
+        "title": "Google Classroom"
+    },
+    "canvas": {
+        "districts_tab": "[Data] Canvas - Districts", 
+        "apps_tab": "[Data] Canvas - Apps",
+        "flag": "lms-connect-fully-owned-solution-canvas", 
+        "color": "#E13939", 
+        "title": "Canvas"
+    },
+    "schoology": {
+        "districts_tab": "[Data] Schoology - Districts", 
+        "apps_tab": "[Data] Schoology - Apps",
+        "flag": "lms-connect-fully-owned-solution-schoology", 
+        "color": "#00AEEF", 
+        "title": "Schoology"
+    }
 }
 
 def get_ld(flag):
@@ -46,7 +64,7 @@ global_apps_matrix = {}
 app_name_map = {}
 total_targeted_apps = 34  
 
-# Loop 1: Pre-populate app configuration statuses straight from LaunchDarkly API states
+# Loop 1: Pre-populate app configurations straight from LaunchDarkly API states
 for key, cfg in LMS_CONFIGS.items():
     ld_ids = get_ld(cfg['flag'])
     for target_id in ld_ids:
@@ -56,10 +74,22 @@ for key, cfg in LMS_CONFIGS.items():
                 global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[clean_id][key] = True
 
-# Loop 2: Process spreadsheets and build the layout roster records
+# Loop 2: NEW! Automatically learn name mappings by reading the dedicated "- Apps" spreadsheet tabs
 for key, cfg in LMS_CONFIGS.items():
     try:
-        rows = doc.worksheet(cfg['tab']).get_all_records()
+        app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
+        for row in app_rows:
+            raw_name = str(row.get('App Name', '')).strip()
+            raw_id = str(row.get('Prod App ID', '')).strip()
+            if raw_name and raw_id:
+                app_name_map[raw_id] = raw_name
+    except Exception as e:
+        print(f"Notice: Could not parse apps mapping tab {cfg['apps_tab']}: {e}")
+
+# Loop 3: Process district tabs and build layout roster records
+for key, cfg in LMS_CONFIGS.items():
+    try:
+        rows = doc.worksheet(cfg['districts_tab']).get_all_records()
         ld_ids = get_ld(cfg['flag'])
         apps_ok = any(i.startswith("app:") for i in ld_ids)
         
@@ -71,17 +101,7 @@ for key, cfg in LMS_CONFIGS.items():
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
-
-            # Parse out names mapping profiles for display fields
-            for app in app_list:
-                if "(" in app and ")" in app:
-                    name_part = app.split('(').strip()
-                    id_part = app.split('(').replace(')', '').strip()
-                    app_name_map[id_part] = name_part
-                elif len(app) == 24:
-                    # Fallback configuration to capture direct ID tokens if string matches length
-                    app_name_map[app] = app
-
+            
             bts_date = str(r.get('BTS Dates', 'TBD')).strip()
             if not bts_date: bts_date = "TBD"
             
@@ -139,13 +159,13 @@ for key, cfg in LMS_CONFIGS.items():
             </div>
         </details>"""
     except Exception as e:
-        print(f"Error on tab {cfg['tab']}: {e}")
+        print(f"Error on tab {cfg['districts_tab']}: {e}")
 
 # Calculate metrics states 
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- 3. HTML ASSEMBLY (ALL STRINGS SANITIZED & ESCAPED DOWN HERE) ---
+# --- 4. HTML ASSEMBLY ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
     display_name = app_name_map.get(app_id, app_id)
