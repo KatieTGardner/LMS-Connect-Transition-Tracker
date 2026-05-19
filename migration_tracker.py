@@ -117,51 +117,27 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['tab']}: {e}")
 
-# --- APPLICATION TRANSITION METRICS CALCULATION ---
-# Total unique applications actively targeted across row entries 
+# --- APPLICATION TRANSITION METRICS CALCULATION (ROBUST VERSION) ---
 total_targeted_apps = 34  
-
-<div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <h2 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">Partner Applications Migration Status</h2>
-            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks migration validation states across individual developer app environment allocations.</p>
-        </div>
-        <div style="display: flex; gap: 40px; align-items: center;">
-            <div style="text-align: center;">
-                <span style="display: block; font-size: 2rem; font-weight: 700; color: #10b981;">{live_prod_apps_count}</span>
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Live Prod Apps</span>
-            </div>
-            <div style="border-left: 1px solid #e2e8f0; height: 40px;"></div>
-            <div style="text-align: center;">
-                <span style="display: block; font-size: 2rem; font-weight: 700; color: #64748b;">{total_targeted_apps}</span>
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600;">Total Targeted Pool</span>
-            </div>
-            <div style="border-left: 1px solid #e2e8f0; height: 40px;"></div>
-            <div style="background: #ecfdf5; color: #065f46; padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 1.1rem;">
-                {app_progress_pct}% Complete
-            </div>
-        </div>
-    </div>
-</div>
-
-# Initialize our counting baseline tracker
 live_prod_apps_count = 0
 seen_app_ids = set()
 
-# Parse the sheet row dictionaries to find individual application activations
-for d in districts_data:
-    # Safely extract and clean comma-separated App IDs mapped in the row string field
-    if d.get('apps'):
-        row_app_ids = [a.strip() for a in str(d['apps']).split(',') if a.strip()]
-        for app_id in row_app_ids:
-            if app_id not in seen_app_ids:
-                seen_app_ids.add(app_id)
-                # If a district row is marked Done, its associated app has transitioned successfully
-                if d.get('done') is True:
-                    live_prod_apps_count += 1
+# Safe fallback check: verify if our main app loop object parameters are initialized
+if 'dropdowns_html' in locals() or 'rows_html' in locals():
+    # Loop over your script's native districts data wrapper object
+    for d in districts_data if 'districts_data' in locals() else []:
+        # Use .get() defensively to completely prevent KeyError failures on blank fields
+        app_field = d.get('apps')
+        if app_field:
+            row_app_ids = [a.strip() for a in str(app_field).split(',') if a.strip()]
+            for app_id in row_app_ids:
+                if app_id not in seen_app_ids:
+                    seen_app_ids.add(app_id)
+                    # Check if the district row is marked Done or complete
+                    if d.get('done') == 'Done' or d.get('done') is True:
+                        live_prod_apps_count += 1
 
-# Calculate the progress percentage safely to avoid any potential ZeroDivisionError
+# Safely calculate the progress percentage ratio
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
 # --- 3. HTML ASSEMBLY ---
