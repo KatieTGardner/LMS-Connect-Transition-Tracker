@@ -52,7 +52,27 @@ for key, cfg in LMS_CONFIGS.items():
         rows = doc.worksheet(cfg['tab']).get_all_records()
         ld_ids = get_ld(cfg['flag'])
         apps_ok = any(i.startswith("app:") for i in ld_ids)
+       
+# --- IMPROVED DATA COMPILATION & DISCOVERY ---
+global_apps_matrix = {}
+app_name_map = {} # Maps Hex IDs to Friendly Names from the spreadsheet
+
+for key, cfg in LMS_CONFIGS.items():
+    try:
+        rows = doc.worksheet(cfg['tab']).get_all_records()
+        ld_ids = get_ld(cfg['flag']) # Active IDs fetched directly from LaunchDarkly
+        apps_ok = any(i.startswith("app:") for i in ld_ids)
         
+        # 1. Discover App IDs directly from the LaunchDarkly flag targets first!
+        for target_id in ld_ids:
+            if target_id.startswith("app:"):
+                clean_app_id = target_id.replace("app:", "").strip()
+                if clean_app_id not in global_apps_matrix:
+                    global_apps_matrix[clean_app_id] = {"google": False, "canvas": False, "schoology": False}
+                # If it's targeted in the flag, mark it as True for this LMS immediately!
+                global_apps_matrix[clean_app_id][key] = True
+
+        # 2. Parse spreadsheet to build the names map and handle district rows
         districts_data = []
         for r in rows:
             rid = str(r.get('District Id', '')).strip()
@@ -61,11 +81,20 @@ for key, cfg in LMS_CONFIGS.items():
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
+            
+            # Match friendly names to Hex IDs if available in the tracking sheets
+            # Assumes format "My Ada Math (64cbff9e498f330001ce6412)" or matches clean IDs
+            for app in app_list:
+                if "(" in app and ")" in app:
+                    name_part = app.split('(').strip()
+                    id_part = app.split('(').replace(')', '').strip()
+                    app_name_map[id_part] = name_part
+                elif len(app) == 24: # Direct hex identifier string length
+                    app_name_map[app] = r.get('District Name', app) if "Math" in r.get('District Name','') else app
 
             bts_date = str(r.get('BTS Dates', 'TBD')).strip()
-            if not bts_date: bts_date = "TBD"
-            
             is_done = pre in ld_ids and apps_ok
+            
             districts_data.append({
                 "id": rid, 
                 "name": r.get('District Name', rid), 
@@ -76,27 +105,7 @@ for key, cfg in LMS_CONFIGS.items():
                 "done": is_done
             })
 
-            # Populate matrix arrays for application visibility
-            if app_list:
-                for app_id in app_list:
-                    if app_id not in global_apps_matrix:
-                        global_apps_matrix[app_id] = {"google": False, "canvas": False, "schoology": False}
-                    if is_done:
-                        global_apps_matrix[app_id][key] = True
-        
-        done_count = sum(1 for d in districts_data if d['done'])
-        total = len(districts_data)
-        pct = int((done_count/total)*100) if total > 0 else 0
-        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
-        
-        cards_html += f"""
-        <div class="card">
-            <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
-            <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
-            <div class="stats">{pct}%</div>
-            <p><b>{done_count}</b> / {total} Districts</p>
-            {warn}
-        </div>"""
+        # Keep existing cards_html and rows_html assembly here...
         
         rows_html = "".join([f"""
             <tr>
@@ -133,16 +142,23 @@ for key, cfg in LMS_CONFIGS.items():
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- BUILD THE NEW APPLICATIONS DROPDOWN COMPONENT (ESCAPED FOR STRINGS) ---
+# --- BUILD THE NEW APPLICATIONS DROPDOWN COMPONENT ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
+    # Resolve friendly name if discovered in tracking tabs, otherwise display ID string
+    display_name = app_name_map.get(app_id, app_id)
+    if display_name != app_id:
+        display_label = f"{display_name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
+    else:
+        display_label = f"<span style='font-family:monospace;'>{app_id}</span>"
+
     gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
     canvas_status = '<span class="ok">✅ Active</span>' if systems['canvas'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
     schoology_status = '<span class="ok">✅ Active</span>' if systems['schoology'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
     
     apps_matrix_rows.append(f"""
         <tr>
-            <td style="font-family:monospace; font-weight:600; padding:12px; border-bottom:1px solid #f1f3f4;">{app_id}</td>
+            <td style="font-weight:600; padding:12px; border-bottom:1px solid #f1f3f4; text-align:left;">{display_label}</td>
             <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{gc_status}</td>
             <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{canvas_status}</td>
             <td style="text-align:center; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
