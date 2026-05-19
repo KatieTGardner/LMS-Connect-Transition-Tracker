@@ -8,7 +8,6 @@ GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
 
-# Production feature flag names matched to your exact LaunchDarkly environment profile
 LMS_CONFIGS = {
     "google": {
         "districts_tab": "[Data] Google Classroom - Districts", 
@@ -70,21 +69,31 @@ for key, cfg in LMS_CONFIGS.items():
     for target_id in ld_ids:
         if target_id.startswith("app:"):
             clean_id = target_id.replace("app:", "").strip()
-            # DEFENSIVE FIXED PATTERN: Only instantiate if the key does not exist yet!
             if clean_id not in global_apps_matrix:
                 global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[clean_id][key] = True
 
-# Loop 2: Learn name mappings automatically via the dedicated "- Apps" spreadsheet tabs
+# Loop 2: Robust matching that handles column name whitespace variants
 for key, cfg in LMS_CONFIGS.items():
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
         for row in app_rows:
-            raw_name = str(row.get('App Name', '')).strip()
-            raw_id = str(row.get('Prod App ID', '')).strip()
+            # Normalize headers by removing casing and spaces to find the right column
+            normalized_row = {str(k).strip().lower().replace(" ", ""): v for k, v in row.items()}
+            
+            raw_name = ""
+            for k, v in row.items():
+                if "appname" in str(k).lower().replace(" ", ""):
+                    raw_name = str(v).strip()
+            
+            raw_id = ""
+            for k, v in row.items():
+                norm_k = str(k).lower().replace(" ", "").replace("_", "")
+                if "prodappid" in norm_k or "appid" in norm_k:
+                    raw_id = str(v).strip()
+
             if raw_name and raw_id:
                 app_name_map[raw_id] = raw_name
-                # Ensure all sheet discovered apps are captured in target map structures safely
                 if raw_id not in global_apps_matrix:
                     global_apps_matrix[raw_id] = {"google": False, "canvas": False, "schoology": False}
     except Exception as e:
@@ -192,7 +201,7 @@ for app_id, systems in sorted(global_apps_matrix.items()):
     """)
 
 apps_dropdown_html = f"""
-<details style="margin-bottom: 24px; background: white; border-radius: 8px; border: 1px solid #e0e0e0;">
+<details style="margin-bottom: 24px; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" open>
     <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
         <span>📦 Partner Application-Side LMS Matrix (Real-Time Flags)</span>
         <span class="sum-count">{live_prod_apps_count} / {total_targeted_apps} Enabled</span>
