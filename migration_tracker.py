@@ -9,137 +9,75 @@ SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
 
 LMS_CONFIGS = {
-    "google": {
-        "districts_tab": "[Data] Google Classroom - Districts", 
-        "apps_tab": "[Data] Google Classroom - Apps",
-        "flag": "lms-connect-google-classroom-mvp", 
-        "color": "#34A853", 
-        "title": "Google Classroom"
-    },
-    "canvas": {
-        "districts_tab": "[Data] Canvas - Districts", 
-        "apps_tab": "[Data] Canvas - Apps",
-        "flag": "lms-connect-fully-owned-solution-canvas", 
-        "color": "#E13939", 
-        "title": "Canvas"
-    },
-    "schoology": {
-        "districts_tab": "[Data] Schoology - Districts", 
-        "apps_tab": "[Data] Schoology - Apps",
-        "flag": "lms-connect-fully-owned-solution-schoology", 
-        "color": "#00AEEF", 
-        "title": "Schoology"
-    }
+    "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
+    "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
+    "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
 }
 
-# Strict regex matching 24-character hexadecimal MongoDB/Clever App Object IDs
-ID_PATTERN = re.compile(r'\b([a-fA-F0-9]{24})\b')
-
-def get_ld_hex_ids(flag):
-    """Fetches LaunchDarkly targets and extracts all valid 24-character hex IDs safely."""
+def get_ld(flag):
     url = f"https://app.launchdarkly.com/api/v2/flags/default/{flag}"
     headers = {"Authorization": str(LD_TOKEN), "LD-API-Version": "beta"}
-    found_ids = set()
     try:
         res = requests.get(url, headers=headers).json()
         env_data = res.get('environments', {}).get(ENV, {})
-        
-        raw_strings = []
+        vals = []
         for t in env_data.get('targets', []):
-            raw_strings.extend(t.get('values', []))
+            if t.get('variation') == 0: vals.extend(t.get('values', []))
         for r in env_data.get('rules', []):
-            for c in r.get('clauses', []): 
-                raw_strings.extend(c.get('values', []))
-                
-        for s in raw_strings:
-            matches = ID_PATTERN.findall(str(s))
-            for m in matches:
-                found_ids.add(m.strip().lower())
+            if r.get('variation') == 0:
+                for c in r.get('clauses', []): vals.extend(c.get('values', []))
+        return [str(i).strip() for i in vals]
     except Exception as e:
-        print(f"Error reading LD flag {flag}: {e}")
-    return list(found_ids)
+        print(f"Error fetching LD flag {flag}: {e}")
+        return []
 
-# --- 2. AUTH & GOOGLE API INITIALIZATION ---
+# --- 2. AUTH & FETCH ---
 try:
     creds_dict = json.loads(GOOG_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
     doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 except Exception as e:
-    print(f"CRITICAL AUTH FAILURE: {e}")
+    print(f"CRITICAL ERROR: {e}")
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
-app_name_map = {}
 total_targeted_apps = 34  
 
-# PHASE 1: Build master name dictionary indices by reading the text cells explicitly
+# Loop over the district tabs to calculate the core district dashboard metrics
 for key, cfg in LMS_CONFIGS.items():
     try:
-        app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
-        for row in app_rows:
-            # Enforce clean string conversions to prevent missing type parsing locks
-            row_text = " ".join([str(v) for v in row.values() if v is not None])
-            found_ids = ID_PATTERN.findall(row_text)
-            
-            # Locate friendly name cell values
-            app_name = ""
-            for k, v in row.items():
-                if "name" in str(k).lower().replace(" ", ""):
-                    app_name = str(v).strip()
-                    break
-            
-            if not app_name and row.values():
-                app_name = str(list(row.values())).strip()
-
-            for hex_id in found_ids:
-                clean_id = hex_id.lower().strip()
-                if app_name and len(clean_id) == 24:
-                    app_name_map[clean_id] = app_name
-    except Exception as e:
-        print(f"Notice: Skipping apps tab optimization mapping loop: {cfg['apps_tab']} -> {e}")
-
-# PHASE 2: Fetch LaunchDarkly real-time configuration markers
-for key, cfg in LMS_CONFIGS.items():
-    active_ld_hexes = get_ld_hex_ids(cfg['flag'])
-    for hex_id in active_ld_hexes:
-        clean_hex = hex_id.lower().strip()
-        if clean_hex not in global_apps_matrix:
-            global_apps_matrix[clean_hex] = {"google": False, "canvas": False, "schoology": False}
-        global_apps_matrix[clean_hex][key] = True
-
-# PHASE 3: Process districts rosters records
-for key, cfg in LMS_CONFIGS.items():
-    try:
-        rows = doc.worksheet(cfg['districts_tab']).get_all_records()
-        ld_hexes = get_ld_hex_ids(cfg['flag'])
+        rows = doc.worksheet(cfg['tab']).get_all_records()
+        ld_ids = get_ld(cfg['flag'])
+        apps_ok = any("app:" in str(i) or len(str(i)) >= 24 for i in ld_ids)
         
         districts_data = []
         for r in rows:
-            row_text = " ".join([str(v) for v in r.values() if v is not None])
-            district_hexes = ID_PATTERN.findall(row_text)
-            
-            rid = district_hexes if district_hexes else str(r.get('District Id', '')).strip()
-            d_name = r.get('District Name', rid)
+            rid = str(r.get('District Id', '')).strip()
+            pre = f"district:{rid}" if rid and not rid.startswith("district:") else rid
             
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
+
+            bts_date = str(r.get('BTS Dates', 'TBD')).strip()
+            if not bts_date: bts_date = "TBD"
             
-            is_done = rid.lower().strip() in ld_hexes if rid else False
+            is_done = pre in ld_ids and apps_ok
             districts_data.append({
                 "id": rid, 
-                "name": d_name, 
+                "name": r.get('District Name', rid), 
                 "segment": r.get('Segment', 'N/A'), 
                 "csm": r.get('CSM Name', 'N/A'), 
                 "apps": formatted_apps,
-                "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
+                "bts": bts_date,
                 "done": is_done
             })
         
         done_count = sum(1 for d in districts_data if d['done'])
         total = len(districts_data)
         pct = int((done_count/total)*100) if total > 0 else 0
+        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
         
         cards_html += f"""
         <div class="card">
@@ -147,6 +85,7 @@ for key, cfg in LMS_CONFIGS.items():
             <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
             <div class="stats">{pct}%</div>
             <p><b>{done_count}</b> / {total} Districts</p>
+            {warn}
         </div>"""
         
         rows_html = "".join([f"""
@@ -178,23 +117,47 @@ for key, cfg in LMS_CONFIGS.items():
             </div>
         </details>"""
     except Exception as e:
-        print(f"Error handling tab interface update {cfg['districts_tab']}: {e}")
+        print(f"Error on tab {cfg['tab']}: {e}")
 
-# Compute summary metrics metrics 
+# --- NEW: CLEAN APPLICATION COUPLING AND MATRIX PARSING ---
+# Dynamically extract all 24-character hexadecimal chunks out of the LaunchDarkly rules
+for key, cfg in LMS_CONFIGS.items():
+    ld_ids = get_ld(cfg['flag'])
+    for raw_target in ld_ids:
+        # Extracts exactly the 24 hex characters for either raw inputs or "Label app:ID" layouts
+        hex_matches = re.findall(r'\b([a-fA-F0-9]{24})\b', str(raw_target))
+        for clean_id in hex_matches:
+            if clean_id not in global_apps_matrix:
+                global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
+            global_apps_matrix[clean_id][key] = True
+
+# Read the dedicated App configuration sheet to dynamically link Hex IDs to friendly names
+app_name_map = {}
+try:
+    app_rows = doc.worksheet("[Data] Google Classroom - Apps").get_all_records()
+    for row in app_rows:
+        name_val = str(row.get('App Name', '')).strip()
+        id_val = str(row.get('Prod App ID', '')).strip()
+        if not id_val: # Fallback lookup check if column name spaces differ
+            id_val = str(row.get('App ID Used for Testing', '')).strip()
+        if name_val and id_val:
+            app_name_map[id_val.lower().strip()] = name_val
+except Exception as e:
+    print(f"Name lookup optimization warning: {e}")
+
+# Compute totals from our application matrix rows
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- 4. HTML ASSEMBLY LOOP ---
+# --- 3. HTML ASSEMBLY ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
-    clean_key = app_id.lower().strip()
-    display_name = app_name_map.get(clean_key, app_id)
+    friendly_name = app_name_map.get(app_id.lower().strip(), "")
+    if not friendly_name and app_id == "64cbff9e498f330001ce6412":
+        friendly_name = "My Ada Math"
     
-    if display_name != app_id:
-        display_label = f"{display_name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
-    else:
-        display_label = f"<span style='font-family:monospace;'>{app_id}</span>"
-
+    display_label = f"{friendly_name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>" if friendly_name else f"<span style='font-family:monospace;'>{app_id}</span>"
+    
     gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
     canvas_status = '<span class="ok">✅ Active</span>' if systems['canvas'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
     schoology_status = '<span class="ok">✅ Active</span>' if systems['schoology'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
@@ -273,6 +236,7 @@ final_content = f"""
         .bar {{ background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }}
         .bar div {{ height: 100%; transition: width 1s; }}
         .stats {{ font-size: 2.5em; font-weight: bold; }}
+        .app-warn {{ color:#d93025; font-size:11px; font-weight:bold; margin-top:5px; }}
         
         details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1300px; border: 1px solid #e0e0e0; }}
         summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }}
