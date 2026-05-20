@@ -26,7 +26,7 @@ def get_ld(flag):
         for r in env_data.get('rules', []):
             if r.get('variation') == 0:
                 for c in r.get('clauses', []): vals.extend(c.get('values', []))
-        return [str(i).strip().lower() for i in vals] # Force lowercase matching tokens
+        return [str(i).strip().lower() for i in vals]
     except Exception as e:
         print(f"Error fetching LD flag {flag}: {e}")
         return []
@@ -59,7 +59,6 @@ for key, cfg in LMS_CONFIGS.items():
     
     # Process the active partner app matrix matches directly against the text file keys
     for app_id in app_name_map.keys():
-        # Check if the raw ID string or the modified "app:ID" sequence exists in LaunchDarkly targets
         if app_id in ld_ids or f"app:{app_id}" in ld_ids or any(app_id in str(x) for x in ld_ids):
             if app_id not in global_apps_matrix:
                 global_apps_matrix[app_id] = {"google": False, "canvas": False, "schoology": False}
@@ -211,3 +210,56 @@ apps_summary_block = f"""
         </div>
     </div>
 </div>
+"""
+
+ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
+
+final_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>LMS Transition Tracker</title>
+    <style>
+        body {{ font-family: -apple-system, system-ui, sans-serif; background: #f4f7f9; padding: 40px; color: #202124; line-height: 1.5; }}
+        .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }}
+        .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); width: 260px; text-align: center; border: 1px solid #e0e0e0; }}
+        .bar {{ background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }}
+        .bar div {{ height: 100%; transition: width 1s; }}
+        .stats {{ font-size: 2.5em; font-weight: bold; }}
+        .app-warn {{ color:#d93025; font-size:11px; font-weight:bold; margin-top:5px; }}
+        
+        details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1300px; border: 1px solid #e0e0e0; }}
+        summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }}
+        .sum-count {{ background: #f1f3f4; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; }}
+        
+        .table-wrap {{ padding: 0 20px 20px; overflow-x: auto; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px; }}
+        th, td {{ padding: 12px 10px; border-bottom: 1px solid #f1f3f4; vertical-align: top; }}
+        th {{ color: #5f6368; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }}
+        
+        .district-info {{ display: flex; flex-direction: column; gap: 4px; }}
+        .d-name {{ font-weight: 600; color: #202124; }}
+        .d-id {{ font-family: monospace; font-size: 0.8em; color: #9aa0a6; cursor: pointer; display: inline-block; }}
+        .d-id:hover {{ color: #1a73e8; text-decoration: underline; }}
+        
+        .app-cell {{ color: #5f6368; font-style: italic; max-width: 300px; word-wrap: break-word; }}
+        .bts-cell {{ font-weight: 500; color: #1a73e8; }}
+        .ok {{ color: #1e8e3e; font-weight: bold; }}
+        .no {{ color: #d93025; font-weight: bold; }}
+        .ts {{ text-align: center; color: #9aa0a6; font-size: 0.8em; margin-top: 50px; }}
+    </style>
+</head>
+<body>
+    <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
+    {apps_summary_block}
+    {apps_dropdown_html}
+    <div class="container">{cards_html}</div>
+    {dropdowns_html}
+    <div class="ts">Last Sync: {ts} (PT)</div>
+</body>
+</html>
+"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(final_content)
