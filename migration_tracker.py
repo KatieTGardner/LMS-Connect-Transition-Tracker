@@ -14,11 +14,11 @@ LMS_CONFIGS = {
     "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
 }
 
-# The true production scope mapping parameters (Safeguarded against the 23-char LD typo)
+# Master Production Scope Map
 app_name_map = {
     "5d41ba752769fb0001ae10fa": "Khan Academy",
     "64cbff9e498f330001ce6412": "My Ada Math",
-    "64cbf9e498f330001ce6412": "My Ada Math",  # Defensive fallback for the 23-char LaunchDarkly typo
+    "64cbf9e498f330001ce6412": "My Ada Math",  # Defensive fallback variation string for the 23-char LD typo
     "68a35343a1f1a21425233bcf": "Ellipsis Education",
     "5b2077fb03a826000165c4a1": "ClassHero",
     "607472b92b7bf90001040d41": "Smart Science Education",
@@ -38,22 +38,66 @@ app_name_map = {
     "5b4640e82b1e1d000194b2c2": "BrainPOP Suite"
 }
 
-def get_ld(flag):
+def clean_id_string(raw_str):
+    """Strips any type prefixes (app:, district:) and isolates the clean target ID."""
+    val = str(raw_str).strip().lower()
+    if val.startswith("app:"):
+        val = val.replace("app:", "")
+    if val.startswith("district:"):
+        val = val.replace("district:", "")
+    return val.strip()
+
+def get_ld_environment_state(flag):
+    """Fetches comprehensive structural rule arrays and defaults from LaunchDarkly."""
     url = f"https://app.launchdarkly.com/api/v2/flags/default/{flag}"
     headers = {"Authorization": str(LD_TOKEN), "LD-API-Version": "beta"}
+    
+    state = {"default_is_on": False, "explicit_true_keys": set(), "explicit_false_keys": set()}
+    
     try:
         res = requests.get(url, headers=headers).json()
         env_data = res.get('environments', {}).get(ENV, {})
-        vals = []
-        for t in env_data.get('targets', []):
-            if t.get('variation') == 0: vals.extend(t.get('values', []))
-        for r in env_data.get('rules', []):
-            if r.get('variation') == 0:
-                for c in r.get('clauses', []): vals.extend(c.get('values', []))
-        return [str(i).strip().lower() for i in vals]
+        
+        flag_is_on = env_data.get('on', False)
+        default_variation = env_data.get('fallthrough', {}).get('variation', 0) if flag_is_on else env_data.get('offVariation', 1)
+        state["default_is_on"] = (default_variation == 0)
+        
+        # Parse targets and explicitly isolate the clean ID strings
+        for target in env_data.get('targets', []):
+            var_idx = target.get('variation', 1)
+            for val in target.get('values', []):
+                clean_val = clean_id_string(val)
+                if var_idx == 0:
+                    state["explicit_true_keys"].add(clean_val)
+                else:
+                    state["explicit_false_keys"].add(clean_val)
+                    
+        # Parse custom rollout/exclusion rules and clean ID strings
+        for rule in env_data.get('rules', []):
+            var_idx = rule.get('variation', 1)
+            for clause in rule.get('clauses', []):
+                for val in clause.get('values', []):
+                    clean_val = clean_id_string(val)
+                    if var_idx == 0:
+                        state["explicit_true_keys"].add(clean_val)
+                    else:
+                        state["explicit_false_keys"].add(clean_val)
+                        
     except Exception as e:
-        print(f"Error fetching LD flag {flag}: {e}")
-        return []
+        print(f"Error compiling active LaunchDarkly rule matrices for {flag}: {e}")
+        
+    return state
+
+def evaluate_key_status(clean_id, ld_state):
+    """Determines flag status by direct lookups against clean true/false sets."""
+    raw_key = clean_id.lower().strip()
+    
+    if raw_key in ld_state["explicit_true_keys"]:
+        return True
+    if raw_key in ld_state["explicit_false_keys"]:
+        return False
+        
+    return ld_state["default_is_on"]
 
 # --- 2. AUTH & FETCH ---
 try:
@@ -61,36 +105,40 @@ try:
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
     doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 except Exception as e:
-    print(f"CRITICAL ERROR: {e}")
+    print(f"CRITICAL AUTH ERROR: {e}")
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
-total_targeted_apps = 18  # 19 keys in app_name_map, but My Ada Math has 2 variants, meaning 18 unique apps in true production scope
+total_targeted_apps = 18 
 
-# Loop over configurations to parse specific LaunchDarkly targets
+ld_flags_cache = {}
 for key, cfg in LMS_CONFIGS.items():
-    ld_ids = get_ld(cfg['flag'])
-    
+    ld_flags_cache[key] = get_ld_environment_state(cfg['flag'])
+
+# Loop over configurations to populate the Application Matrix layout rows
+for key, cfg in LMS_CONFIGS.items():
+    ld_state = ld_flags_cache[key]
     for app_id in app_name_map.keys():
         clean_app_id = app_id.lower().strip()
-        if clean_app_id in ld_ids or f"app:{clean_app_id}" in ld_ids or any(clean_app_id in str(x) for x in ld_ids):
+        if evaluate_key_status(clean_app_id, ld_state):
             if clean_app_id not in global_apps_matrix:
                 global_apps_matrix[clean_app_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[clean_app_id][key] = True
 
-# Loop over district spreadsheet tabs to preserve your deep roster tracking frames
+# Loop over district spreadsheet tabs to populate regional tracker components
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['tab']).get_all_records()
-        ld_ids = get_ld(cfg['flag'])
-        apps_ok = any("app:" in str(i) for i in ld_ids)
+        ld_state = ld_flags_cache[key]
+        
+        apps_ok = ld_state["default_is_on"] or len(ld_state["explicit_true_keys"]) > 0
         
         districts_data = []
         for r in rows:
-            rid = str(r.get('District Id', '')).strip()
-            pre = f"district:{rid}" if rid and not rid.startswith("district:") else rid
-            
+            # Clean district ID variations from spreadsheet directly
+            rid = clean_id_string(r.get('District Id', ''))
+                
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
@@ -98,10 +146,11 @@ for key, cfg in LMS_CONFIGS.items():
             bts_date = str(r.get('BTS Dates', 'TBD')).strip()
             if not bts_date: bts_date = "TBD"
             
-            is_done = (pre.lower() in ld_ids or rid.lower() in ld_ids)
+            is_done = evaluate_key_status(rid, ld_state)
+            
             districts_data.append({
                 "id": rid, 
-                "name": r.get('District Name', rid), 
+                "name": r.get('District Name', r.get('District Id', rid)), 
                 "segment": r.get('Segment', 'N/A'), 
                 "csm": r.get('CSM Name', 'N/A'), 
                 "apps": formatted_apps,
@@ -136,7 +185,7 @@ for key, cfg in LMS_CONFIGS.items():
                 <td class="app-cell">{d['apps']}</td>
                 <td class="bts-cell">{d['bts']}</td>
                 <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
-            </tr>""" for d in sorted(districts_data, key=lambda x: x['name'])])
+            </tr>""" for d in sorted(districts_data, key=lambda x: str(x['name']))])
         
         dropdowns_html += f"""
         <details>
@@ -152,10 +201,9 @@ for key, cfg in LMS_CONFIGS.items():
             </div>
         </details>"""
     except Exception as e:
-        print(f"Error on tab {cfg['tab']}: {e}")
+        print(f"Error handling UI layout components generation on tab {cfg['tab']}: {e}")
 
-# Check evaluations for both the valid ID and the typo version to count live active apps accurately
-live_prod_apps_count = 0
+# Deduplicate live counters smoothly
 deduped_live_apps = set()
 for app_id, states in global_apps_matrix.items():
     if any(states.values()):
@@ -163,10 +211,9 @@ for app_id, states in global_apps_matrix.items():
         if name_match:
             deduped_live_apps.add(name_match)
 live_prod_apps_count = len(deduped_live_apps)
-
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- 3. HTML ASSEMBLY ---
+# --- 4. HTML INTERFACE RENDER COMPONENT ROWS ---
 apps_matrix_rows = []
 seen_app_names = set()
 
@@ -177,7 +224,6 @@ for app_id, name in sorted(app_name_map.items(), key=lambda x: x):
     clean_key = app_id.lower().strip()
     systems = global_apps_matrix.get(clean_key, {"google": False, "canvas": False, "schoology": False})
     
-    # Combined logic override evaluating both potential IDs for My Ada Math simultaneously
     if name == "My Ada Math":
         typo_sys = global_apps_matrix.get("64cbf9e498f330001ce6412", {"google": False, "canvas": False, "schoology": False})
         valid_sys = global_apps_matrix.get("64cbff9e498f330001ce6412", {"google": False, "canvas": False, "schoology": False})
