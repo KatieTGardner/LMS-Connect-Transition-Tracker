@@ -14,10 +14,11 @@ LMS_CONFIGS = {
     "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
 }
 
-# The true production scope mapping parameters (Excludes all test/dev IDs)
+# The true production scope mapping parameters (Safeguarded against the 23-char LD typo)
 app_name_map = {
     "5d41ba752769fb0001ae10fa": "Khan Academy",
     "64cbff9e498f330001ce6412": "My Ada Math",
+    "64cbf9e498f330001ce6412": "My Ada Math",  # Defensive fallback for the 23-char LaunchDarkly typo
     "68a35343a1f1a21425233bcf": "Ellipsis Education",
     "5b2077fb03a826000165c4a1": "ClassHero",
     "607472b92b7bf90001040d41": "Smart Science Education",
@@ -65,7 +66,7 @@ except Exception as e:
 
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
-total_targeted_apps = len(app_name_map)
+total_targeted_apps = 18  # 19 keys in app_name_map, but My Ada Math has 2 variants, meaning 18 unique apps in true production scope
 
 # Loop over configurations to parse specific LaunchDarkly targets
 for key, cfg in LMS_CONFIGS.items():
@@ -73,7 +74,6 @@ for key, cfg in LMS_CONFIGS.items():
     
     for app_id in app_name_map.keys():
         clean_app_id = app_id.lower().strip()
-        # Verify both variations (raw hexadecimal vs string array prefix structure)
         if clean_app_id in ld_ids or f"app:{clean_app_id}" in ld_ids or any(clean_app_id in str(x) for x in ld_ids):
             if clean_app_id not in global_apps_matrix:
                 global_apps_matrix[clean_app_id] = {"google": False, "canvas": False, "schoology": False}
@@ -154,17 +154,36 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['tab']}: {e}")
 
-live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
+# Check evaluations for both the valid ID and the typo version to count live active apps accurately
+live_prod_apps_count = 0
+deduped_live_apps = set()
+for app_id, states in global_apps_matrix.items():
+    if any(states.values()):
+        name_match = app_name_map.get(app_id)
+        if name_match:
+            deduped_live_apps.add(name_match)
+live_prod_apps_count = len(deduped_live_apps)
+
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
 # --- 3. HTML ASSEMBLY ---
 apps_matrix_rows = []
-# Ensure alphabetical sort layout order based on Application descriptive text labels
+seen_app_names = set()
+
 for app_id, name in sorted(app_name_map.items(), key=lambda x: x):
+    if name in seen_app_names:
+        continue
+    
     clean_key = app_id.lower().strip()
     systems = global_apps_matrix.get(clean_key, {"google": False, "canvas": False, "schoology": False})
     
-    display_label = f"{name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
+    # Combined logic override evaluating both potential IDs for My Ada Math simultaneously
+    if name == "My Ada Math":
+        typo_sys = global_apps_matrix.get("64cbf9e498f330001ce6412", {"google": False, "canvas": False, "schoology": False})
+        valid_sys = global_apps_matrix.get("64cbff9e498f330001ce6412", {"google": False, "canvas": False, "schoology": False})
+        systems = {k: (typo_sys[k] or valid_sys[k]) for k in systems}
+        
+    display_label = f"{name} <br><small style='color:#9aa0a6; font-family:monospace;'>64cbff9e498f330001ce6412</small>" if name == "My Ada Math" else f"{name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
     
     gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
     canvas_status = '<span class="ok">✅ Active</span>' if systems['canvas'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
@@ -178,6 +197,7 @@ for app_id, name in sorted(app_name_map.items(), key=lambda x: x):
             <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
         </tr>
     """)
+    seen_app_names.add(name)
 
 apps_dropdown_html = f"""
 <details style="margin-bottom: 24px; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" open>
