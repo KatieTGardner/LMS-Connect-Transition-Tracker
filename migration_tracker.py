@@ -30,11 +30,11 @@ LMS_CONFIGS = {
     }
 }
 
-# Core regex matching exact 24-character hexadecimal MongoDB Object ID keys
+# Regex to safely catch any 24-character hex ID string anywhere in files or rows
 ID_PATTERN = re.compile(r'\b([a-fA-F0-9]{24})\b')
 
 def get_raw_hex_ids_from_file(filename):
-    """Scrapes any valid 24-character hex ID string found inside a file."""
+    """Scrapes all valid 24-character hex strings found inside a file."""
     found_ids = set()
     if os.path.exists(filename):
         try:
@@ -44,7 +44,7 @@ def get_raw_hex_ids_from_file(filename):
                 for m in matches:
                     found_ids.add(m.strip().lower())
         except Exception as e:
-            print(f"Error reading raw target logs file {filename}: {e}")
+            print(f"Error reading target file {filename}: {e}")
     return found_ids
 
 # --- 2. AUTH & INITIALIZATION ---
@@ -60,20 +60,21 @@ cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
 app_name_map = {}
 
-# Master index groups to perfectly cross-reference our IDs
 all_sheet_app_ids = set()
 all_sheet_district_ids = set()
 tab_district_data_cache = {}
 
-# --- STEP 1: PARSE ALL SPREADSHEET TABS FIRST ---
+# --- STEP 1: PARSE GOOGLE SPREADSHEETS FIRST ---
 for key, cfg in LMS_CONFIGS.items():
-    # A. Pull App Names and IDs from the App Tabs
+    # A. Build clean Application indices from your Apps tab
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
         for row in app_rows:
+            # Look inside every column cell string for hex ids
             row_str = " ".join([str(v) for v in row.values() if v is not None])
             found_ids = ID_PATTERN.findall(row_str)
             
+            # Extract the correct friendly app name text
             app_name = ""
             for k, v in row.items():
                 if "name" in str(k).lower().replace(" ", ""):
@@ -88,9 +89,9 @@ for key, cfg in LMS_CONFIGS.items():
                 if app_name:
                     app_name_map[clean_id] = app_name
     except Exception as e:
-        print(f"Notice: Skipping apps lookup tab {cfg['apps_tab']}: {e}")
+        print(f"Notice: Skipping apps tab {cfg['apps_tab']}: {e}")
 
-    # B. Cache District Records and extract their structural IDs
+    # B. Build clean District indices from your Districts tab
     try:
         dist_rows = doc.worksheet(cfg['districts_tab']).get_all_records()
         tab_district_data_cache[key] = dist_rows
@@ -100,33 +101,32 @@ for key, cfg in LMS_CONFIGS.items():
             for hid in found_ids:
                 all_sheet_district_ids.add(hid.lower().strip())
     except Exception as e:
-        print(f"Notice: Skipping districts tab cache step {cfg['districts_tab']}: {e}")
+        print(f"Notice: Skipping districts tab {cfg['districts_tab']}: {e}")
 
-# --- STEP 2: COMPILE THE GLOBAL APPLICATION STATUS MATRIX ---
+# Hardcoded engineering fallback map to catch the My Ada Math prod hex if missing from sheets
+app_name_map["64cbff9e498f330001ce6412"] = "My Ada Math"
+all_sheet_app_ids.add("64cbff9e498f330001ce6412")
+
+# --- STEP 2: COMPILE THE CROSS-REFERENCED PARTNER APPLICATION MATRIX ---
 for key, cfg in LMS_CONFIGS.items():
     file_hexes = get_raw_hex_ids_from_file(cfg['file'])
     
-    # Cross-reference step: Isolate the real application IDs
+    # Cross-Reference Step: Match IDs present in the .txt file with valid app IDs from your sheet
     app_hexes_in_file = file_hexes.intersection(all_sheet_app_ids)
     
-    # Custom fallback rule for the My Ada Math ID if it's missing from the apps sheet tab
-    if "64cbff9e498f330001ce6412" in file_hexes:
-        app_hexes_in_file.add("64cbff9e498f330001ce6412")
-        app_name_map["64cbff9e498f330001ce6412"] = "My Ada Math"
-        
     for clean_id in app_hexes_in_file:
         if clean_id not in global_apps_matrix:
             global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
         global_apps_matrix[clean_id][key] = True
 
-# --- STEP 3: ASSEMBLE HIGH-LEVEL DISTRICT METRICS & TABLES ---
+# --- STEP 3: ASSEMBLE HIGH-LEVEL DISTRICT CARDS & ROSTERS ---
 for key, cfg in LMS_CONFIGS.items():
     rows = tab_district_data_cache.get(key, [])
     file_hexes = get_raw_hex_ids_from_file(cfg['file'])
     
-    # Cross-reference step: Isolate the real district IDs
+    # Cross-Reference Step: Match IDs present in the .txt file with valid district IDs from your sheet
     ld_district_hexes = file_hexes.intersection(all_sheet_district_ids)
-    apps_ok = len(file_hexes.intersection(all_sheet_app_ids)) > 0 or "64cbff9e498f330001ce6412" in file_hexes
+    apps_ok = len(file_hexes.intersection(all_sheet_app_ids)) > 0
     
     districts_data = []
     for r in rows:
@@ -194,12 +194,12 @@ for key, cfg in LMS_CONFIGS.items():
         </div>
     </details>"""
 
-# Dynamic calculation counts based strictly on valid spreadsheet application entries
+# Dynamic application metrics logic metrics calculation formulas
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 total_targeted_apps = len(all_sheet_app_ids) if len(all_sheet_app_ids) > 0 else 34
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- STEP 4: HTML INTERFACE COMPONENT GENERATION ---
+# --- STEP 4: INTERFACE RENDER COMPONENT ROWS ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
     clean_key = app_id.lower().strip()
