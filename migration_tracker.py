@@ -32,30 +32,40 @@ LMS_CONFIGS = {
     }
 }
 
-def get_ld(flag):
+# Strict regex matching 24-character hexadecimal MongoDB/Clever App Object IDs
+ID_PATTERN = re.compile(r'\b([a-fA-F0-9]{24})\b')
+
+def get_ld_hex_ids(flag):
+    """Fetches LaunchDarkly targets and extracts all valid 24-character hex IDs safely."""
     url = f"https://app.launchdarkly.com/api/v2/flags/default/{flag}"
     headers = {"Authorization": str(LD_TOKEN), "LD-API-Version": "beta"}
+    found_ids = set()
     try:
         res = requests.get(url, headers=headers).json()
         env_data = res.get('environments', {}).get(ENV, {})
-        vals = []
+        
+        raw_strings = []
         for t in env_data.get('targets', []):
-            if t.get('variation') == 0: vals.extend(t.get('values', []))
+            raw_strings.extend(t.get('values', []))
         for r in env_data.get('rules', []):
-            if r.get('variation') == 0:
-                for c in r.get('clauses', []): vals.extend(c.get('values', []))
-        return [str(i).strip() for i in vals]
+            for c in r.get('clauses', []): 
+                raw_strings.extend(c.get('values', []))
+                
+        for s in raw_strings:
+            matches = ID_PATTERN.findall(str(s))
+            for m in matches:
+                found_ids.add(m.strip().lower())
     except Exception as e:
-        print(f"Error fetching LD flag {flag}: {e}")
-        return []
+        print(f"Error reading LD flag {flag}: {e}")
+    return list(found_ids)
 
-# --- 2. AUTH & FETCH ---
+# --- 2. AUTH & GOOGLE API INITIALIZATION ---
 try:
     creds_dict = json.loads(GOOG_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
     doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 except Exception as e:
-    print(f"CRITICAL ERROR: {e}")
+    print(f"CRITICAL AUTH FAILURE: {e}")
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
@@ -63,100 +73,73 @@ global_apps_matrix = {}
 app_name_map = {}
 total_targeted_apps = 34  
 
-# Loop 1: Query LaunchDarkly API flag states first
-for key, cfg in LMS_CONFIGS.items():
-    ld_ids = get_ld(cfg['flag'])
-    for target_id in ld_ids:
-        if target_id.startswith("app:"):
-            clean_id = target_id.replace("app:", "").strip()
-            if clean_id not in global_apps_matrix:
-                global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
-            global_apps_matrix[clean_id][key] = True
-
-# --- Loop 2: LEARN NAME MAPPINGS WITH DIAGNOSTIC LOGGING ---
-print("\n=== STARTING SPREADSHEET ANALYSIS ===")
+# PHASE 1: Build master name dictionary indices by reading the text cells explicitly
 for key, cfg in LMS_CONFIGS.items():
     try:
-        print(f"\nProcessing Sheet Tab: {cfg['apps_tab']}")
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
-        
-        if not app_rows:
-            print(f"⚠️ Warning: Tab {cfg['apps_tab']} returned zero rows.")
-            continue
+        for row in app_rows:
+            # Enforce clean string conversions to prevent missing type parsing locks
+            row_text = " ".join([str(v) for v in row.values() if v is not None])
+            found_ids = ID_PATTERN.findall(row_text)
             
-        print(f"Found {len(app_rows)} rows. Raw column headers: {list(app_rows.keys())}")
-        
-        for idx, row in enumerate(app_rows):
-            raw_name = ""
-            raw_id = ""
-            
-            # 1. Isolate the true App Name column safely
+            # Locate friendly name cell values
+            app_name = ""
             for k, v in row.items():
-                norm_k = str(k).lower().replace(" ", "").replace("_", "")
-                if "appname" in norm_k:
-                    raw_name = str(v).strip()
+                if "name" in str(k).lower().replace(" ", ""):
+                    app_name = str(v).strip()
+                    break
             
-            # 2. Strict ID matching: Prioritize 'prodappid', avoid 'testing' or 'sandbox'
-            for k, v in row.items():
-                norm_k = str(k).lower().replace(" ", "").replace("_", "")
-                if "prodappid" in norm_k:
-                    raw_id = str(v).strip()
-                    break # Perfect match found
-                elif "appid" in norm_k and "test" not in norm_k and "sand" not in norm_k:
-                    raw_id = str(v).strip()
+            if not app_name and row.values():
+                app_name = str(list(row.values())).strip()
 
-            # Logging evaluation output for rows containing data
-            if raw_name or raw_id:
-                if len(raw_id) == 24: # Enforce standard MongoDB Hex ID length check
-                    app_name_map[raw_id] = raw_name
-                    if raw_id not in global_apps_matrix:
-                        global_apps_matrix[raw_id] = {"google": False, "canvas": False, "schoology": False}
-                else:
-                    print(f"⚠️ Row {idx+2}: Skipped invalid or empty Hex ID string: '{raw_id}' for App: '{raw_name}'")
-                    
+            for hex_id in found_ids:
+                clean_id = hex_id.lower().strip()
+                if app_name and len(clean_id) == 24:
+                    app_name_map[clean_id] = app_name
     except Exception as e:
-        print(f"❌ Error parsing apps mapping tab {cfg['apps_tab']}: {e}")
+        print(f"Notice: Skipping apps tab optimization mapping loop: {cfg['apps_tab']} -> {e}")
 
-print("\n=== VERIFYING FINAL MASTER DICTIONARY POOL ===")
-print(f"Total Unique Apps Mapped: {len(app_name_map)}")
-print(f"Parsed Application Map Profiles: {json.dumps(app_name_map, indent=2)}")
-print(f"Current LaunchDarkly Active Flag Matrix: {json.dumps(global_apps_matrix, indent=2)}")
-print("============================================\n")
+# PHASE 2: Fetch LaunchDarkly real-time configuration markers
+for key, cfg in LMS_CONFIGS.items():
+    active_ld_hexes = get_ld_hex_ids(cfg['flag'])
+    for hex_id in active_ld_hexes:
+        clean_hex = hex_id.lower().strip()
+        if clean_hex not in global_apps_matrix:
+            global_apps_matrix[clean_hex] = {"google": False, "canvas": False, "schoology": False}
+        global_apps_matrix[clean_hex][key] = True
 
-# Loop 3: Process districts data rosters
+# PHASE 3: Process districts rosters records
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['districts_tab']).get_all_records()
-        ld_ids = get_ld(cfg['flag'])
-        apps_ok = any(i.startswith("app:") for i in ld_ids)
+        ld_hexes = get_ld_hex_ids(cfg['flag'])
         
         districts_data = []
         for r in rows:
-            rid = str(r.get('District Id', '')).strip()
-            pre = f"district:{rid}" if rid and not rid.startswith("district:") else rid
+            row_text = " ".join([str(v) for v in r.values() if v is not None])
+            district_hexes = ID_PATTERN.findall(row_text)
+            
+            rid = district_hexes if district_hexes else str(r.get('District Id', '')).strip()
+            d_name = r.get('District Name', rid)
             
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
             
-            bts_date = str(r.get('BTS Dates', 'TBD')).strip()
-            if not bts_date: bts_date = "TBD"
-            
-            is_done = pre in ld_ids and apps_ok
+            is_done = rid.lower().strip() in ld_hexes if rid else False
             districts_data.append({
                 "id": rid, 
-                "name": r.get('District Name', rid), 
+                "name": d_name, 
                 "segment": r.get('Segment', 'N/A'), 
                 "csm": r.get('CSM Name', 'N/A'), 
                 "apps": formatted_apps,
-                "bts": bts_date,
+                "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
                 "done": is_done
             })
         
         done_count = sum(1 for d in districts_data if d['done'])
         total = len(districts_data)
         pct = int((done_count/total)*100) if total > 0 else 0
-        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
         
         cards_html += f"""
         <div class="card">
@@ -164,7 +147,6 @@ for key, cfg in LMS_CONFIGS.items():
             <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
             <div class="stats">{pct}%</div>
             <p><b>{done_count}</b> / {total} Districts</p>
-            {warn}
         </div>"""
         
         rows_html = "".join([f"""
@@ -196,16 +178,18 @@ for key, cfg in LMS_CONFIGS.items():
             </div>
         </details>"""
     except Exception as e:
-        print(f"Error on tab {cfg['districts_tab']}: {e}")
+        print(f"Error handling tab interface update {cfg['districts_tab']}: {e}")
 
-# Calculate active metrics status
+# Compute summary metrics metrics 
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- 4. HTML ASSEMBLY ---
+# --- 4. HTML ASSEMBLY LOOP ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
-    display_name = app_name_map.get(app_id, app_id)
+    clean_key = app_id.lower().strip()
+    display_name = app_name_map.get(clean_key, app_id)
+    
     if display_name != app_id:
         display_label = f"{display_name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
     else:
@@ -289,7 +273,6 @@ final_content = f"""
         .bar {{ background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }}
         .bar div {{ height: 100%; transition: width 1s; }}
         .stats {{ font-size: 2.5em; font-weight: bold; }}
-        .app-warn {{ color:#d93025; font-size:11px; font-weight:bold; margin-top:5px; }}
         
         details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1300px; border: 1px solid #e0e0e0; }}
         summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }}
