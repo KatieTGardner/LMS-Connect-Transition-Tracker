@@ -63,8 +63,9 @@ all_sheet_app_ids = set()
 all_sheet_district_ids = set()
 cached_districts_rows = {}
 
-# PHASE 1: Build the app name mapping dictionary and parse spreadsheets FIRST
+# PHASE 1: Parse Google Spreadsheets to populate mapping keys first
 for key, cfg in LMS_CONFIGS.items():
+    # A. Parse apps lookup configurations
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
         for row in app_rows:
@@ -87,6 +88,7 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Notice: Skipping apps tab parsing {cfg['apps_tab']}: {e}")
 
+    # B. Parse districts rosters records
     try:
         dist_rows = doc.worksheet(cfg['districts_tab']).get_all_records()
         cached_districts_rows[key] = dist_rows
@@ -98,17 +100,21 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Notice: Skipping district pre-check parsing {cfg['districts_tab']}: {e}")
 
-# Core fallbacks to guarantee key profiles are protected regardless of sheet configurations
+# Engineering fallback records overrides to secure My Ada Math presentation values
 app_name_map["64cbff9e498f330001ce6412"] = "My Ada Math"
 app_name_map["65b007468aeae2000126eedd"] = "My Ada Math (Dev)"
+all_sheet_app_ids.add("64cbff9e498f330001ce6412")
+all_sheet_app_ids.add("65b007468aeae2000126eedd")
 
 # PHASE 2: Populate the Global Application Status Matrix
 for key, cfg in LMS_CONFIGS.items():
     file_hexes = get_raw_hex_ids_from_file(cfg['file'])
     
-    # Process app IDs (exclude strings recognized as districts)
+    # Evaluate raw text file strings for explicit 'app:' prefixes or registered sheet targets
     for hex_id in file_hexes:
-        if hex_id not in all_sheet_district_ids or hex_id in all_sheet_app_ids or hex_id in ["64cbff9e498f330001ce6412", "65b007468aeae2000126eedd"]:
+        is_an_app = hex_id in all_sheet_app_ids or hex_id in ["64cbff9e498f330001ce6412", "65b007468aeae2000126eedd"]
+        
+        if is_an_app:
             if hex_id not in global_apps_matrix:
                 global_apps_matrix[hex_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[hex_id][key] = True
@@ -131,6 +137,7 @@ for key, cfg in LMS_CONFIGS.items():
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
             
+            # Verify if the district ID is explicitly present inside LaunchDarkly's target list
             is_done = rid in file_hexes if rid else False
             districts_data.append({
                 "id": rid, 
