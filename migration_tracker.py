@@ -30,11 +30,11 @@ LMS_CONFIGS = {
     }
 }
 
-# Universal regex pattern to isolate any valid 24-character hexadecimal MongoDB/Clever Object ID
+# Regex pattern matching exact 24-character hexadecimal MongoDB/Clever Object IDs
 ID_PATTERN = re.compile(r'\b([a-fA-F0-9]{24})\b')
 
 def get_raw_hex_ids_from_file(filename):
-    """Scrapes any valid 24-character hex string found inside a file line stream."""
+    """Scrapes any valid 24-character hex string found inside a target text file."""
     found_ids = set()
     if os.path.exists(filename):
         try:
@@ -44,30 +44,31 @@ def get_raw_hex_ids_from_file(filename):
                 for m in matches:
                     found_ids.add(m.strip().lower())
         except Exception as e:
-            print(f"Error reading local file {filename}: {e}")
+            print(f"Error reading local file backup {filename}: {e}")
     return found_ids
 
-# --- 2. AUTH & INITIALIZATION ---
+# --- 2. AUTH & GOOGLE API INITIALIZATION ---
 try:
     creds_dict = json.loads(GOOG_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
     doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 except Exception as e:
-    print(f"CRITICAL AUTH ERROR: {e}")
+    print(f"CRITICAL AUTH FAILURE: {e}")
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
 app_name_map = {}
-all_known_app_ids = set()
+all_sheet_app_ids = set()
+all_sheet_district_ids = set()
 
-# --- STEP 1: PARSE THE MASTER APP NAME LOOKUP MAPS ---
+# PHASE 1: Build the app name mapping dictionary from your spreadsheet tabs
 for key, cfg in LMS_CONFIGS.items():
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
         for row in app_rows:
-            row_str = " ".join([str(v) for v in row.values() if v is not None])
-            found_ids = ID_PATTERN.findall(row_str)
+            row_text = " ".join([str(v) for v in row.values() if v is not None])
+            found_ids = ID_PATTERN.findall(row_text)
             
             app_name = ""
             for k, v in row.items():
@@ -76,46 +77,50 @@ for key, cfg in LMS_CONFIGS.items():
                     break
             if not app_name and row.values():
                 app_name = str(list(row.values())).strip()
-                
-            for hid in found_ids:
-                clean_id = hid.lower().strip()
-                all_known_app_ids.add(clean_id)
+
+            for hex_id in found_ids:
+                clean_id = hex_id.lower().strip()
+                all_sheet_app_ids.add(clean_id)
                 if app_name:
                     app_name_map[clean_id] = app_name
     except Exception as e:
-        print(f"Notice: Caching skipped on apps lookup tab {cfg['apps_tab']}: {e}")
+        print(f"Notice: Skipping apps tab parsing {cfg['apps_tab']}: {e}")
 
-# Safety system overrides to protect core engineering records from spreadsheet string drops
+    try:
+        dist_rows = doc.worksheet(cfg['districts_tab']).get_all_records()
+        for row in dist_rows:
+            row_text = " ".join([str(v) for v in row.values() if v is not None])
+            found_ids = ID_PATTERN.findall(row_text)
+            for hex_id in found_ids:
+                all_sheet_district_ids.add(hex_id.lower().strip())
+    except Exception as e:
+        print(f"Notice: Skipping district pre-check parsing {cfg['districts_tab']}: {e}")
+
+# Core fallbacks to guarantee key profiles are protected regardless of sheet configurations
 app_name_map["64cbff9e498f330001ce6412"] = "My Ada Math"
 app_name_map["65b007468aeae2000126eedd"] = "My Ada Math (Dev)"
-all_known_app_ids.add("64cbff9e498f330001ce6412")
-all_known_app_ids.add("65b007468aeae2000126eedd")
 
-# --- STEP 2: COMPILE THE GLOBAL APPLICATION STATUS MATRIX ---
+# PHASE 2: Populate the Global Application Status Matrix
 for key, cfg in LMS_CONFIGS.items():
     file_hexes = get_raw_hex_ids_from_file(cfg['file'])
     
-    # Identify app targets by scanning lines containing explicit app-prefixes or matching master keys
+    # Process app IDs (exclude strings recognized as districts)
     for hex_id in file_hexes:
-        if hex_id in all_known_app_ids:
+        if hex_id not in all_sheet_district_ids or hex_id in all_sheet_app_ids:
             if hex_id not in global_apps_matrix:
                 global_apps_matrix[hex_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[hex_id][key] = True
 
-# --- STEP 3: ASSEMBLE HIGH-LEVEL DISTRICT CARDS & ROSTERS ---
+# PHASE 3: Process district tabs and generate layout cards and rosters
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['districts_tab']).get_all_records()
         file_hexes = get_raw_hex_ids_from_file(cfg['file'])
         
-        # Filter out application keys to accurately isolate school district targets
-        ld_district_hexes = {hid for hid in file_hexes if hid not in all_known_app_ids}
-        apps_ok = len(file_hexes.intersection(all_known_app_ids)) > 0
-        
         districts_data = []
         for r in rows:
-            row_str = " ".join([str(v) for v in r.values() if v is not None])
-            district_hexes = ID_PATTERN.findall(row_str)
+            row_text = " ".join([str(v) for v in r.values() if v is not None])
+            district_hexes = ID_PATTERN.findall(row_text)
             
             rid = district_hexes.lower().strip() if district_hexes else str(r.get('District Id', '')).strip().lower()
             d_name = r.get('District Name', rid)
@@ -124,7 +129,7 @@ for key, cfg in LMS_CONFIGS.items():
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
             
-            is_done = rid in ld_district_hexes if rid else False
+            is_done = rid in file_hexes if rid else False
             districts_data.append({
                 "id": rid, 
                 "name": d_name, 
@@ -134,11 +139,11 @@ for key, cfg in LMS_CONFIGS.items():
                 "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
                 "done": is_done
             })
-            
+        
         done_count = sum(1 for d in districts_data if d['done'])
         total = len(districts_data)
         pct = int((done_count/total)*100) if total > 0 else 0
-        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
+        warn = "" if len(file_hexes) > 0 or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
         
         cards_html += f"""
         <div class="card">
@@ -178,14 +183,14 @@ for key, cfg in LMS_CONFIGS.items():
             </div>
         </details>"""
     except Exception as e:
-        print(f"Error on district tab loop execution {cfg['districts_tab']}: {e}")
+        print(f"Error on tab loop {cfg['districts_tab']}: {e}")
 
-# Calculate application metrics counters 
+# Compute application metrics totals from the isolated app pool matrix records
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
-total_targeted_apps = len(all_known_app_ids) if len(all_known_app_ids) > 0 else 34
+total_targeted_apps = 34
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- STEP 4: INTERFACE HTML GRID COMPONENT ASSEMBLY ---
+# --- PHASE 4: HTML ASSEMBLY LOOP ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
     clean_key = app_id.lower().strip()
@@ -306,7 +311,3 @@ final_content = f"""
     <div class="ts">Last Sync: {ts} (PT)</div>
 </body>
 </html>
-"""
-
-with open("index.html", "w", encoding="utf-8") as f:
-    f.write(final_content)
