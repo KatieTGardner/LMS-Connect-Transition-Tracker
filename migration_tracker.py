@@ -62,39 +62,48 @@ def get_ld_environment_state(flag):
         default_variation = env_data.get('fallthrough', {}).get('variation', 0) if flag_is_on else env_data.get('offVariation', 1)
         state["default_is_on"] = (default_variation == 0)
         
-        # Parse targets and explicitly isolate the clean ID strings
+        # Parse targets and harvest values
         for target in env_data.get('targets', []):
             var_idx = target.get('variation', 1)
             for val in target.get('values', []):
+                raw_val = str(val).strip().lower()
                 clean_val = clean_id_string(val)
                 if var_idx == 0:
                     state["explicit_true_keys"].add(clean_val)
+                    state["explicit_true_keys"].add(raw_val)
                 else:
                     state["explicit_false_keys"].add(clean_val)
+                    state["explicit_false_keys"].add(raw_val)
                     
-        # Parse custom rollout/exclusion rules and clean ID strings
+        # Parse custom rollout/exclusion rules
         for rule in env_data.get('rules', []):
             var_idx = rule.get('variation', 1)
             for clause in rule.get('clauses', []):
                 for val in clause.get('values', []):
+                    raw_val = str(val).strip().lower()
                     clean_val = clean_id_string(val)
                     if var_idx == 0:
                         state["explicit_true_keys"].add(clean_val)
+                        state["explicit_true_keys"].add(raw_val)
                     else:
                         state["explicit_false_keys"].add(clean_val)
+                        state["explicit_false_keys"].add(raw_val)
                         
     except Exception as e:
         print(f"Error compiling active LaunchDarkly rule matrices for {flag}: {e}")
         
     return state
 
-def evaluate_key_status(clean_id, ld_state):
-    """Determines flag status by direct lookups against clean true/false sets."""
+def evaluate_key_status(clean_id, type_prefix, ld_state):
+    """Determines flag status by running robust, non-prefixed and prefixed lookups."""
     raw_key = clean_id.lower().strip()
+    prefixed_key = f"{type_prefix}:{raw_key}"
     
-    if raw_key in ld_state["explicit_true_keys"]:
+    # Check true variants across both formatting structures
+    if raw_key in ld_state["explicit_true_keys"] or prefixed_key in ld_state["explicit_true_keys"]:
         return True
-    if raw_key in ld_state["explicit_false_keys"]:
+    # Check false/exclusion variants across both formatting structures
+    if raw_key in ld_state["explicit_false_keys"] or prefixed_key in ld_state["explicit_false_keys"]:
         return False
         
     return ld_state["default_is_on"]
@@ -121,7 +130,7 @@ for key, cfg in LMS_CONFIGS.items():
     ld_state = ld_flags_cache[key]
     for app_id in app_name_map.keys():
         clean_app_id = app_id.lower().strip()
-        if evaluate_key_status(clean_app_id, ld_state):
+        if evaluate_key_status(clean_app_id, "app", ld_state):
             if clean_app_id not in global_apps_matrix:
                 global_apps_matrix[clean_app_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[clean_app_id][key] = True
@@ -136,7 +145,6 @@ for key, cfg in LMS_CONFIGS.items():
         
         districts_data = []
         for r in rows:
-            # Clean district ID variations from spreadsheet directly
             rid = clean_id_string(r.get('District Id', ''))
                 
             raw_apps = str(r.get('Connected Apps', '')).strip()
@@ -146,7 +154,7 @@ for key, cfg in LMS_CONFIGS.items():
             bts_date = str(r.get('BTS Dates', 'TBD')).strip()
             if not bts_date: bts_date = "TBD"
             
-            is_done = evaluate_key_status(rid, ld_state)
+            is_done = evaluate_key_status(rid, "district", ld_state)
             
             districts_data.append({
                 "id": rid, 
@@ -203,7 +211,7 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error handling UI layout components generation on tab {cfg['tab']}: {e}")
 
-# Deduplicate live counters smoothly
+# Deduplicate live counters cleanly
 deduped_live_apps = set()
 for app_id, states in global_apps_matrix.items():
     if any(states.values()):
@@ -251,10 +259,10 @@ apps_dropdown_html = f"""
         <span>📦 Partner Application-Side LMS Matrix (Real-Time Flags)</span>
         <span class="sum-count">{live_prod_apps_count} / {total_targeted_apps} Enabled</span>
     </summary>
-    <div class="table-wrap" style="padding: 0 20px 20px; overflow-x: auto;">
+    <div class="table-wrap" style="max-height: 500px; overflow-y: auto; padding: 0 20px 20px;">
         <table style="width:100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px;">
-            <thead>
-                <tr style="background:#f1f3f4; color: #5f6368;">
+            <thead style="position: sticky; top: 0; background: #f1f3f4; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
+                <tr style="color: #5f6368;">
                     <th style="padding:12px; text-align:left;">Application Profile / ID</th>
                     <th style="padding:12px; text-align:center;">Google Classroom</th>
                     <th style="padding:12px; text-align:center;">Canvas</th>
@@ -316,8 +324,13 @@ final_content = f"""
         summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }}
         .sum-count {{ background: #f1f3f4; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; }}
         
-        .table-wrap {{ padding: 0 20px 20px; overflow-x: auto; }}
+        /* Sticky Header Table Wrapping */
+        .table-wrap {{ padding: 0 20px 20px; max-height: 600px; overflow-y: auto; position: relative; }}
         table {{ width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px; }}
+        
+        /* Forces the table headers to float at top when scrolling down */
+        thead {{ position: sticky; top: 0; background: #f1f3f4; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }}
+        
         th, td {{ padding: 12px 10px; border-bottom: 1px solid #f1f3f4; vertical-align: top; }}
         th {{ color: #5f6368; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }}
         
