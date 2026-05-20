@@ -16,7 +16,42 @@
         h1 {
             text-align: center;
             font-weight: 400;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 0 0 32px 0;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            border: 1px solid #d0d7de;
+            background: white;
+            color: #24292f;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            text-decoration: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+            font-family: inherit;
+        }
+
+        .action-btn:hover {
+            background: #f6f8fa;
+            border-color: #afb8c1;
+        }
+
+        .sync-note {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: -20px;
+            margin-bottom: 28px;
         }
 
         .container {
@@ -53,13 +88,6 @@
         .stats {
             font-size: 2.5em;
             font-weight: bold;
-        }
-
-        .app-warn {
-            color: #d93025;
-            font-size: 11px;
-            font-weight: bold;
-            margin-top: 5px;
         }
 
         details {
@@ -123,9 +151,7 @@
             letter-spacing: 0.5px;
         }
 
-        .center {
-            text-align: center;
-        }
+        .center { text-align: center; }
 
         .district-info {
             display: flex;
@@ -222,9 +248,7 @@
             flex-wrap: wrap;
         }
 
-        .metric {
-            text-align: center;
-        }
+        .metric { text-align: center; }
 
         .metric-value {
             display: block;
@@ -232,13 +256,8 @@
             font-weight: 700;
         }
 
-        .green {
-            color: #10b981;
-        }
-
-        .gray {
-            color: #64748b;
-        }
+        .green { color: #10b981; }
+        .gray { color: #64748b; }
 
         .metric-label {
             font-size: 0.75rem;
@@ -262,9 +281,7 @@
             font-size: 1.1rem;
         }
 
-        .app-matrix {
-            margin-bottom: 24px;
-        }
+        .app-matrix { margin-bottom: 24px; }
 
         .app-table-wrap {
             max-height: 500px;
@@ -282,12 +299,22 @@
 </head>
 <body>
     <h1>LMS Connect Transition Hub</h1>
+
+    <div class="dashboard-actions">
+        <button onclick="window.location.reload();" class="action-btn">🔄 Refresh Dashboard</button>
+        <a href="https://github.com/katietgardner/LMS-Connect-Transition-Tracker/actions/workflows/main.yml" target="_blank" class="action-btn">⚡ Run Sync</a>
+    </div>
+
+    <div class="sync-note">
+        Run Sync opens GitHub Actions. After the workflow completes, come back here and click Refresh Dashboard.
+    </div>
+
     
 <div class="summary-block">
     <div class="summary-flex">
         <div>
-            <h2>Partner Applications Migration Status</h2>
-            <p>Tracks total active applications currently configured across platforms.</p>
+            <h2>App Feature Flags Overview</h2>
+            <p>Tracks total active application feature flags currently configured across platforms.</p>
         </div>
         <div class="summary-metrics">
             <div class="metric">
@@ -308,7 +335,7 @@
     
 <details class="app-matrix" open>
     <summary>
-        <span>📦 Partner Application-Side LMS Matrix (Real-Time Flags)</span>
+        <span>📦 App Feature Flags Details</span>
         <span class="sum-count">1 / 18 Enabled</span>
     </summary>
     <div class="table-wrap app-table-wrap">
@@ -333,7 +360,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         American Reading Company
@@ -344,7 +371,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         ClassHero
@@ -355,7 +382,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         BrainPOP Jr.
@@ -366,7 +393,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         BrainPOP ELL
@@ -377,7 +404,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         BrainPOP Suite
@@ -388,7 +415,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Khan Academy
@@ -399,7 +426,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Thinking Nation
@@ -410,7 +437,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         BrainPOP Español
@@ -421,7 +448,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         BrainPOP Français
@@ -432,7 +459,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         BrainPOP Science (SSO Only)
@@ -443,7 +470,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Smart Science Education
@@ -454,7 +481,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Studies Weekly
@@ -465,7 +492,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Progress Learning
@@ -476,7 +503,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Klett World Languages
@@ -487,7 +514,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         My Ada Math
@@ -498,7 +525,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Blueprint (PlayVS, formerly Generation Esports)
@@ -509,7 +536,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Open Up Resources
@@ -520,7 +547,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
         <tr>
             <td class="app-profile">
         Ellipsis Education
@@ -531,7 +558,7 @@
             <td class="center"><span class="no muted">⏳ Pending</span></td>
             <td class="center"><span class="no muted">⏳ Pending</span></td>
         </tr>
-        
+    
             </tbody>
         </table>
     </div>
@@ -543,21 +570,18 @@
             <div class="bar"><div style="width:0%;background:#34A853"></div></div>
             <div class="stats">0%</div>
             <p><b>0</b> / 35 Districts</p>
-            
         </div>
         <div class="card">
             <h2 style="color:#E13939">Canvas</h2>
             <div class="bar"><div style="width:0%;background:#E13939"></div></div>
             <div class="stats">0%</div>
-            <p><b>0</b> / 37 Districts</p>
-            
+            <p><b>0</b> / 31 Districts</p>
         </div>
         <div class="card">
             <h2 style="color:#00AEEF">Schoology</h2>
             <div class="bar"><div style="width:0%;background:#00AEEF"></div></div>
             <div class="stats">0%</div>
             <p><b>0</b> / 34 Districts</p>
-            <div class='app-warn'>⚠️ APP GATE CLOSED</div>
         </div></div>
     
         <details>
@@ -567,7 +591,16 @@
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>District (Click ID to Copy)</th>
+                            <th>Segment</th>
+                            <th>CSM</th>
+                            <th>Apps</th>
+                            <th>BTS Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
                     <tbody>
             <tr>
                 <td>
@@ -1030,38 +1063,21 @@
         <details>
             <summary style="border-left: 5px solid #E13939;">
                 <span>Canvas Detailed Roster</span>
-                <span class="sum-count">0 / 37</span>
+                <span class="sum-count">0 / 31</span>
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>District (Click ID to Copy)</th>
+                            <th>Segment</th>
+                            <th>CSM</th>
+                            <th>Apps</th>
+                            <th>BTS Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
                     <tbody>
-            <tr>
-                <td>
-                    <div class="district-info">
-                        <span class="d-name"></span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('');alert('ID Copied!');">ID: </span>
-                    </div>
-                </td>
-                <td></td>
-                <td></td>
-                <td class="app-cell">None</td>
-                <td class="bts-cell">TBD</td>
-                <td class="no">⏳ Pending</td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="district-info">
-                        <span class="d-name"></span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('');alert('ID Copied!');">ID: </span>
-                    </div>
-                </td>
-                <td></td>
-                <td></td>
-                <td class="app-cell">None</td>
-                <td class="bts-cell">TBD</td>
-                <td class="no">⏳ Pending</td>
-            </tr>
             <tr>
                 <td>
                     <div class="district-info">
@@ -1221,45 +1237,6 @@
             <tr>
                 <td>
                     <div class="district-info">
-                        <span class="d-name">Has not used LMS Connect - confirmed by Dennis</span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('');alert('ID Copied!');">ID: </span>
-                    </div>
-                </td>
-                <td></td>
-                <td></td>
-                <td class="app-cell">None</td>
-                <td class="bts-cell">TBD</td>
-                <td class="no">⏳ Pending</td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="district-info">
-                        <span class="d-name">Have never made assignments in My Ada Math via LMS Connect</span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('');alert('ID Copied!');">ID: </span>
-                    </div>
-                </td>
-                <td></td>
-                <td></td>
-                <td class="app-cell">None</td>
-                <td class="bts-cell">TBD</td>
-                <td class="no">⏳ Pending</td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="district-info">
-                        <span class="d-name">Haven't synced/low usage since last September (can be moved)</span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('');alert('ID Copied!');">ID: </span>
-                    </div>
-                </td>
-                <td></td>
-                <td></td>
-                <td class="app-cell">None</td>
-                <td class="bts-cell">TBD</td>
-                <td class="no">⏳ Pending</td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="district-info">
                         <span class="d-name">Iowa City Community School District</span>
                         <span class="d-id" onclick="navigator.clipboard.writeText('5994a7a03086ce000127cb47');alert('ID Copied!');">ID: 5994a7a03086ce000127cb47</span>
                     </div>
@@ -1372,19 +1349,6 @@
                 <td>Danielle Windley</td>
                 <td class="app-cell">My Ada Math</td>
                 <td class="bts-cell">August 13, 2026</td>
-                <td class="no">⏳ Pending</td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="district-info">
-                        <span class="d-name">Not ready to early transition > perhaps open communication? Need to align with Dennis/Cengage</span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('');alert('ID Copied!');">ID: </span>
-                    </div>
-                </td>
-                <td></td>
-                <td></td>
-                <td class="app-cell">None</td>
-                <td class="bts-cell">TBD</td>
                 <td class="no">⏳ Pending</td>
             </tr>
             <tr>
@@ -1527,7 +1491,16 @@
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>District (Click ID to Copy)</th>
+                            <th>Segment</th>
+                            <th>CSM</th>
+                            <th>Apps</th>
+                            <th>BTS Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
                     <tbody>
             <tr>
                 <td>
@@ -1974,6 +1947,6 @@
                 </table>
             </div>
         </details>
-    <div class="ts">Last Sync: May 20, 2026 at 04:09 PM (PT)</div>
+    <div class="ts">Last Sync: May 20, 2026 at 04:25 PM (PT)</div>
 </body>
 </html>
