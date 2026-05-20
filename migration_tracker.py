@@ -2,7 +2,6 @@ import requests, datetime, sys, os, json, gspread, re
 from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
-# --- 1. CONFIGURATION ---
 LD_TOKEN = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("LD_TOKEN", "")
 GOOG_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT")
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
@@ -10,25 +9,12 @@ PROJECT_KEY = "default"
 ENV = "production"
 DEBUG_LD = os.environ.get("DEBUG_LD", "false").lower() == "true"
 
+GITHUB_WORKFLOW_URL = "https://github.com/katietgardner/LMS-Connect-Transition-Tracker/actions/workflows/main.yml"
+
 LMS_CONFIGS = {
-    "google": {
-        "tab": "[Data] Google Classroom - Districts",
-        "flag": "lms-connect-google-classroom-mvp",
-        "color": "#34A853",
-        "title": "Google Classroom",
-    },
-    "canvas": {
-        "tab": "[Data] Canvas - Districts",
-        "flag": "lms-connect-fully-owned-solution-canvas",
-        "color": "#E13939",
-        "title": "Canvas",
-    },
-    "schoology": {
-        "tab": "[Data] Schoology - Districts",
-        "flag": "lms-connect-fully-owned-solution-schoology",
-        "color": "#00AEEF",
-        "title": "Schoology",
-    },
+    "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
+    "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
+    "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"},
 }
 
 app_name_map = {
@@ -69,20 +55,13 @@ def clean_id_string(raw_str):
 def normalize_key_variants(raw_value, type_prefix=None):
     raw = str(raw_value or "").strip().lower()
     clean = clean_id_string(raw)
-
     variants = {raw, clean}
-
     if type_prefix and clean:
         variants.add(f"{type_prefix}:{clean}")
-
     return {v for v in variants if v}
 
 
 def variation_value(flag_response, variation_index):
-    """
-    Converts LaunchDarkly variation index into the actual boolean value.
-    Avoids assuming variation 0 == true.
-    """
     try:
         idx = int(variation_index)
         variations = flag_response.get("variations", [])
@@ -90,7 +69,6 @@ def variation_value(flag_response, variation_index):
             return variations[idx].get("value")
     except Exception:
         pass
-
     return None
 
 
@@ -100,7 +78,6 @@ def add_target_values_to_state(flag_response, state, values, variation_index):
     for val in values or []:
         raw_val = str(val or "").strip().lower()
         clean_val = clean_id_string(raw_val)
-
         variants = {raw_val, clean_val}
 
         if clean_val:
@@ -114,20 +91,8 @@ def add_target_values_to_state(flag_response, state, values, variation_index):
 
 
 def get_ld_environment_state(flag_key):
-    """
-    Fetches LaunchDarkly flag config and extracts explicit true/false targets.
-
-    Supports:
-    - legacy targets
-    - contextTargets
-    - rules / clauses
-    - variation index mapping based on actual variation values
-    """
     url = f"https://app.launchdarkly.com/api/v2/flags/{PROJECT_KEY}/{flag_key}"
-    headers = {
-        "Authorization": LD_TOKEN,
-        "Content-Type": "application/json",
-    }
+    headers = {"Authorization": LD_TOKEN, "Content-Type": "application/json"}
 
     state = {
         "default_is_on": False,
@@ -139,7 +104,6 @@ def get_ld_environment_state(flag_key):
 
     try:
         res = requests.get(url, headers=headers, timeout=30)
-
         if res.status_code >= 400:
             print(f"LaunchDarkly API error for {flag_key}: {res.status_code} {res.text}")
             return state
@@ -153,74 +117,45 @@ def get_ld_environment_state(flag_key):
         env_data = flag_response.get("environments", {}).get(ENV, {})
         state["flag_on"] = bool(env_data.get("on", False))
 
-        # Determine default/fallthrough value safely.
         if state["flag_on"]:
-            fallthrough_variation = env_data.get("fallthrough", {}).get("variation")
-            default_value = variation_value(flag_response, fallthrough_variation)
+            default_value = variation_value(flag_response, env_data.get("fallthrough", {}).get("variation"))
         else:
-            off_variation = env_data.get("offVariation")
-            default_value = variation_value(flag_response, off_variation)
+            default_value = variation_value(flag_response, env_data.get("offVariation"))
 
         state["default_is_on"] = default_value is True
 
-        # 1. Legacy individual targets.
         for target in env_data.get("targets", []) or []:
-            add_target_values_to_state(
-                flag_response,
-                state,
-                target.get("values", []),
-                target.get("variation"),
-            )
+            add_target_values_to_state(flag_response, state, target.get("values", []), target.get("variation"))
 
-        # 2. Modern context targets.
         for target in env_data.get("contextTargets", []) or []:
-            add_target_values_to_state(
-                flag_response,
-                state,
-                target.get("values", []),
-                target.get("variation"),
-            )
+            add_target_values_to_state(flag_response, state, target.get("values", []), target.get("variation"))
 
-        # 3. Rule-based targeting.
         for rule in env_data.get("rules", []) or []:
             rule_variation = rule.get("variation")
 
-            # Simple variation rules.
             for clause in rule.get("clauses", []) or []:
-                add_target_values_to_state(
-                    flag_response,
-                    state,
-                    clause.get("values", []),
-                    rule_variation,
-                )
+                add_target_values_to_state(flag_response, state, clause.get("values", []), rule_variation)
 
-            # Rollout rules. Treat 100% true rollout as true.
             rollout = rule.get("rollout")
             if rollout:
                 variations = rollout.get("variations", []) or []
+
                 true_rollout = any(
-                    variation_value(flag_response, v.get("variation")) is True
-                    and int(v.get("weight", 0)) >= 100000
+                    variation_value(flag_response, v.get("variation")) is True and int(v.get("weight", 0)) >= 100000
                     for v in variations
                 )
 
                 false_rollout = any(
-                    variation_value(flag_response, v.get("variation")) is False
-                    and int(v.get("weight", 0)) >= 100000
+                    variation_value(flag_response, v.get("variation")) is False and int(v.get("weight", 0)) >= 100000
                     for v in variations
                 )
 
                 for clause in rule.get("clauses", []) or []:
-                    values = clause.get("values", [])
-                    if true_rollout:
-                        add_target_values_to_state(flag_response, state, values, 0)
-                        for val in values:
-                            for variant in normalize_key_variants(val):
-                                state["explicit_true_keys"].add(variant)
-                    elif false_rollout:
-                        for val in values:
-                            for variant in normalize_key_variants(val):
-                                state["explicit_false_keys"].add(variant)
+                    for val in clause.get("values", []):
+                        if true_rollout:
+                            state["explicit_true_keys"].update(normalize_key_variants(val))
+                        elif false_rollout:
+                            state["explicit_false_keys"].update(normalize_key_variants(val))
 
         if DEBUG_LD:
             print(f"\n===== PARSED LD STATE: {flag_key} =====")
@@ -230,7 +165,6 @@ def get_ld_environment_state(flag_key):
                 "explicit_true_count": len(state["explicit_true_keys"]),
                 "explicit_false_count": len(state["explicit_false_keys"]),
                 "sample_true_keys": sorted(list(state["explicit_true_keys"]))[:20],
-                "sample_false_keys": sorted(list(state["explicit_false_keys"]))[:20],
             })
 
     except Exception as e:
@@ -241,33 +175,45 @@ def get_ld_environment_state(flag_key):
 
 def evaluate_key_status(clean_id, type_prefix, ld_state):
     raw_key = clean_id_string(clean_id)
-
     variants = normalize_key_variants(raw_key, type_prefix)
 
     if any(v in ld_state["explicit_true_keys"] for v in variants):
         return True
-
     if any(v in ld_state["explicit_false_keys"] for v in variants):
         return False
-
     return ld_state["default_is_on"]
 
 
-# --- 2. AUTH & FETCH ---
+def should_skip_district_row(row):
+    rid = clean_id_string(row.get("District Id", ""))
+    district_name = str(row.get("District Name", "")).strip().lower()
+
+    if not rid or len(rid) < 10:
+        return True
+
+    bad_row_markers = [
+        "has not used",
+        "haven't synced",
+        "have never",
+        "confirmed by",
+        "can be moved",
+        "low usage",
+        "not used lms connect",
+    ]
+
+    return any(marker in district_name for marker in bad_row_markers)
+
+
 try:
     if not LD_TOKEN:
         raise ValueError("Missing LaunchDarkly token. Pass it as argv[1] or set LD_TOKEN.")
-
     if not GOOG_JSON:
         raise ValueError("Missing GOOGLE_SERVICE_ACCOUNT environment variable.")
 
     creds_dict = json.loads(GOOG_JSON)
     creds = Credentials.from_service_account_info(
         creds_dict,
-        scopes=[
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive",
-        ],
+        scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"],
     )
     doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 
@@ -279,12 +225,8 @@ except Exception as e:
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
 
-ld_flags_cache = {}
-for key, cfg in LMS_CONFIGS.items():
-    ld_flags_cache[key] = get_ld_environment_state(cfg["flag"])
+ld_flags_cache = {key: get_ld_environment_state(cfg["flag"]) for key, cfg in LMS_CONFIGS.items()}
 
-
-# --- 3. APPLICATION MATRIX ---
 for key, cfg in LMS_CONFIGS.items():
     ld_state = ld_flags_cache[key]
 
@@ -292,53 +234,49 @@ for key, cfg in LMS_CONFIGS.items():
         clean_app_id = clean_id_string(app_id)
 
         if evaluate_key_status(clean_app_id, "app", ld_state):
-            if clean_app_id not in global_apps_matrix:
-                global_apps_matrix[clean_app_id] = {
-                    "google": False,
-                    "canvas": False,
-                    "schoology": False,
-                }
-
+            global_apps_matrix.setdefault(clean_app_id, {"google": False, "canvas": False, "schoology": False})
             global_apps_matrix[clean_app_id][key] = True
 
 
-# --- 4. DISTRICT CARDS / TABLES ---
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg["tab"]).get_all_records()
         ld_state = ld_flags_cache[key]
 
-        apps_ok = ld_state["default_is_on"] or len(ld_state["explicit_true_keys"]) > 0
-
         districts_data = []
+        seen_district_ids = set()
 
         for r in rows:
+            if should_skip_district_row(r):
+                continue
+
             rid = clean_id_string(r.get("District Id", ""))
+
+            if rid in seen_district_ids:
+                continue
+
+            seen_district_ids.add(rid)
 
             raw_apps = str(r.get("Connected Apps", "")).strip()
             app_list = [a.strip() for a in re.split(r",|;|\|", raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
 
             bts_date = str(r.get("BTS Dates", "TBD")).strip() or "TBD"
-
             is_done = evaluate_key_status(rid, "district", ld_state)
 
-            districts_data.append(
-                {
-                    "id": rid,
-                    "name": r.get("District Name", r.get("District Id", rid)),
-                    "segment": r.get("Segment", "N/A"),
-                    "csm": r.get("CSM Name", "N/A"),
-                    "apps": formatted_apps,
-                    "bts": bts_date,
-                    "done": is_done,
-                }
-            )
+            districts_data.append({
+                "id": rid,
+                "name": r.get("District Name", r.get("District Id", rid)),
+                "segment": r.get("Segment", "N/A"),
+                "csm": r.get("CSM Name", "N/A"),
+                "apps": formatted_apps,
+                "bts": bts_date,
+                "done": is_done,
+            })
 
         done_count = sum(1 for d in districts_data if d["done"])
         total = len(districts_data)
         pct = int((done_count / total) * 100) if total > 0 else 0
-        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
 
         cards_html += f"""
         <div class="card">
@@ -346,12 +284,10 @@ for key, cfg in LMS_CONFIGS.items():
             <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
             <div class="stats">{pct}%</div>
             <p><b>{done_count}</b> / {total} Districts</p>
-            {warn}
         </div>"""
 
-        rows_html = "".join(
-            [
-                f"""
+        rows_html = "".join([
+            f"""
             <tr>
                 <td>
                     <div class="district-info">
@@ -365,9 +301,8 @@ for key, cfg in LMS_CONFIGS.items():
                 <td class="bts-cell">{d['bts']}</td>
                 <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
             </tr>"""
-                for d in sorted(districts_data, key=lambda x: str(x["name"]))
-            ]
-        )
+            for d in sorted(districts_data, key=lambda x: str(x["name"]))
+        ])
 
         dropdowns_html += f"""
         <details>
@@ -377,7 +312,16 @@ for key, cfg in LMS_CONFIGS.items():
             </summary>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>District (Click ID to Copy)</th>
+                            <th>Segment</th>
+                            <th>CSM</th>
+                            <th>Apps</th>
+                            <th>BTS Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
                     <tbody>{rows_html if rows_html else '<tr><td colspan="6">No data found in sheet.</td></tr>'}</tbody>
                 </table>
             </div>
@@ -387,7 +331,6 @@ for key, cfg in LMS_CONFIGS.items():
         print(f"Error generating UI for tab {cfg['tab']}: {e}")
 
 
-# --- 5. SUMMARY COUNTERS ---
 deduped_live_apps = set()
 
 for app_id, states in global_apps_matrix.items():
@@ -400,7 +343,6 @@ live_prod_apps_count = len(deduped_live_apps)
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
 
-# --- 6. APPLICATION MATRIX HTML ---
 apps_matrix_rows = []
 seen_app_names = set()
 
@@ -409,19 +351,11 @@ for app_id, name in sorted(app_name_map.items(), key=lambda x: x):
         continue
 
     clean_key = clean_id_string(app_id)
-    systems = global_apps_matrix.get(
-        clean_key, {"google": False, "canvas": False, "schoology": False}
-    )
+    systems = global_apps_matrix.get(clean_key, {"google": False, "canvas": False, "schoology": False})
 
     if name == "My Ada Math":
-        typo_sys = global_apps_matrix.get(
-            "64cbf9e498f330001ce6412",
-            {"google": False, "canvas": False, "schoology": False},
-        )
-        valid_sys = global_apps_matrix.get(
-            "64cbff9e498f330001ce6412",
-            {"google": False, "canvas": False, "schoology": False},
-        )
+        typo_sys = global_apps_matrix.get("64cbf9e498f330001ce6412", {"google": False, "canvas": False, "schoology": False})
+        valid_sys = global_apps_matrix.get("64cbff9e498f330001ce6412", {"google": False, "canvas": False, "schoology": False})
         systems = {k: typo_sys[k] or valid_sys[k] for k in systems}
 
     display_id = "64cbff9e498f330001ce6412" if name == "My Ada Math" else app_id
@@ -436,16 +370,14 @@ for app_id, name in sorted(app_name_map.items(), key=lambda x: x):
     canvas_status = '<span class="ok">✅ Active</span>' if systems["canvas"] else '<span class="no muted">⏳ Pending</span>'
     schoology_status = '<span class="ok">✅ Active</span>' if systems["schoology"] else '<span class="no muted">⏳ Pending</span>'
 
-    apps_matrix_rows.append(
-        f"""
+    apps_matrix_rows.append(f"""
         <tr>
             <td class="app-profile">{display_label}</td>
             <td class="center">{gc_status}</td>
             <td class="center">{canvas_status}</td>
             <td class="center">{schoology_status}</td>
         </tr>
-        """
-    )
+    """)
 
     seen_app_names.add(name)
 
@@ -453,7 +385,7 @@ for app_id, name in sorted(app_name_map.items(), key=lambda x: x):
 apps_dropdown_html = f"""
 <details class="app-matrix" open>
     <summary>
-        <span>📦 Partner Application-Side LMS Matrix (Real-Time Flags)</span>
+        <span>📦 App Feature Flags Details</span>
         <span class="sum-count">{live_prod_apps_count} / {total_targeted_apps} Enabled</span>
     </summary>
     <div class="table-wrap app-table-wrap">
@@ -479,8 +411,8 @@ apps_summary_block = f"""
 <div class="summary-block">
     <div class="summary-flex">
         <div>
-            <h2>Partner Applications Migration Status</h2>
-            <p>Tracks total active applications currently configured across platforms.</p>
+            <h2>App Feature Flags Overview</h2>
+            <p>Tracks total active application feature flags currently configured across platforms.</p>
         </div>
         <div class="summary-metrics">
             <div class="metric">
@@ -521,7 +453,42 @@ final_content = f"""
         h1 {{
             text-align: center;
             font-weight: 400;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
+        }}
+
+        .dashboard-actions {{
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 0 0 32px 0;
+            flex-wrap: wrap;
+        }}
+
+        .action-btn {{
+            border: 1px solid #d0d7de;
+            background: white;
+            color: #24292f;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            text-decoration: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+            font-family: inherit;
+        }}
+
+        .action-btn:hover {{
+            background: #f6f8fa;
+            border-color: #afb8c1;
+        }}
+
+        .sync-note {{
+            text-align: center;
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: -20px;
+            margin-bottom: 28px;
         }}
 
         .container {{
@@ -558,13 +525,6 @@ final_content = f"""
         .stats {{
             font-size: 2.5em;
             font-weight: bold;
-        }}
-
-        .app-warn {{
-            color: #d93025;
-            font-size: 11px;
-            font-weight: bold;
-            margin-top: 5px;
         }}
 
         details {{
@@ -628,9 +588,7 @@ final_content = f"""
             letter-spacing: 0.5px;
         }}
 
-        .center {{
-            text-align: center;
-        }}
+        .center {{ text-align: center; }}
 
         .district-info {{
             display: flex;
@@ -727,9 +685,7 @@ final_content = f"""
             flex-wrap: wrap;
         }}
 
-        .metric {{
-            text-align: center;
-        }}
+        .metric {{ text-align: center; }}
 
         .metric-value {{
             display: block;
@@ -737,13 +693,8 @@ final_content = f"""
             font-weight: 700;
         }}
 
-        .green {{
-            color: #10b981;
-        }}
-
-        .gray {{
-            color: #64748b;
-        }}
+        .green {{ color: #10b981; }}
+        .gray {{ color: #64748b; }}
 
         .metric-label {{
             font-size: 0.75rem;
@@ -767,9 +718,7 @@ final_content = f"""
             font-size: 1.1rem;
         }}
 
-        .app-matrix {{
-            margin-bottom: 24px;
-        }}
+        .app-matrix {{ margin-bottom: 24px; }}
 
         .app-table-wrap {{
             max-height: 500px;
@@ -787,6 +736,16 @@ final_content = f"""
 </head>
 <body>
     <h1>LMS Connect Transition Hub</h1>
+
+    <div class="dashboard-actions">
+        <button onclick="window.location.reload();" class="action-btn">🔄 Refresh Dashboard</button>
+        <a href="{GITHUB_WORKFLOW_URL}" target="_blank" class="action-btn">⚡ Run Sync</a>
+    </div>
+
+    <div class="sync-note">
+        Run Sync opens GitHub Actions. After the workflow completes, come back here and click Refresh Dashboard.
+    </div>
+
     {apps_summary_block}
     {apps_dropdown_html}
     <div class="container">{cards_html}</div>
@@ -795,7 +754,6 @@ final_content = f"""
 </body>
 </html>
 """
-
 
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(final_content)
