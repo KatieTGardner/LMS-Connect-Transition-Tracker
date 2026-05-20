@@ -8,7 +8,6 @@ GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 ENV = "production"
 
-# FIXED: Aligned feature flag strings exactly to your live LaunchDarkly profiles
 LMS_CONFIGS = {
     "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
     "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
@@ -27,7 +26,7 @@ def get_ld(flag):
         for r in env_data.get('rules', []):
             if r.get('variation') == 0:
                 for c in r.get('clauses', []): vals.extend(c.get('values', []))
-        return [str(i).strip() for i in vals]
+        return [str(i).strip().lower() for i in vals] # Force lowercase matching tokens
     except Exception as e:
         print(f"Error fetching LD flag {flag}: {e}")
         return []
@@ -41,18 +40,37 @@ except Exception as e:
     print(f"CRITICAL ERROR: {e}")
     sys.exit(1)
 
+# Load the custom application tracker index list cleanly from the local repo file
+app_name_map = {}
+if os.path.exists("apps_list.txt"):
+    with open("apps_list.txt", "r", encoding="utf-8") as f:
+        for line in f:
+            if ":" in line:
+                parts = line.split(":", 1)
+                app_name_map[parts.strip().lower()] = parts.strip()
+
 cards_html, dropdowns_html = "", ""
+global_apps_matrix = {}
+total_targeted_apps = len(app_name_map) if len(app_name_map) > 0 else 34
 
-# Baseline App Metrics Counters
-total_targeted_apps = 34  
-live_prod_apps_count = 0
-app_progress_pct = 0
+# Loop over the structural configurations to pull LaunchDarkly values
+for key, cfg in LMS_CONFIGS.items():
+    ld_ids = get_ld(cfg['flag'])
+    
+    # Process the active partner app matrix matches directly against the text file keys
+    for app_id in app_name_map.keys():
+        # Check if the raw ID string or the modified "app:ID" sequence exists in LaunchDarkly targets
+        if app_id in ld_ids or f"app:{app_id}" in ld_ids or any(app_id in str(x) for x in ld_ids):
+            if app_id not in global_apps_matrix:
+                global_apps_matrix[app_id] = {"google": False, "canvas": False, "schoology": False}
+            global_apps_matrix[app_id][key] = True
 
+# Loop over the district tabs to generate high-level metric cards and dropdown rosters
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['tab']).get_all_records()
         ld_ids = get_ld(cfg['flag'])
-        apps_ok = any(str(i).startswith("app:") for i in ld_ids)
+        apps_ok = any("app:" in str(i) for i in ld_ids)
         
         districts_data = []
         for r in rows:
@@ -66,7 +84,7 @@ for key, cfg in LMS_CONFIGS.items():
             bts_date = str(r.get('BTS Dates', 'TBD')).strip()
             if not bts_date: bts_date = "TBD"
             
-            is_done = pre in ld_ids and apps_ok
+            is_done = (pre.lower() in ld_ids or rid.lower() in ld_ids)
             districts_data.append({
                 "id": rid, 
                 "name": r.get('District Name', rid), 
@@ -76,10 +94,6 @@ for key, cfg in LMS_CONFIGS.items():
                 "bts": bts_date,
                 "done": is_done
             })
-            
-            # Simple fallback counter: if My Ada Math prod ID is in the flag targets list, count it as active
-            if "app:64cbff9e498f330001ce6412" in ld_ids:
-                live_prod_apps_count = 1
         
         done_count = sum(1 for d in districts_data if d['done'])
         total = len(districts_data)
@@ -126,12 +140,53 @@ for key, cfg in LMS_CONFIGS.items():
     except Exception as e:
         print(f"Error on tab {cfg['tab']}: {e}")
 
+live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
 # --- 3. HTML ASSEMBLY ---
-ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
+apps_matrix_rows = []
+for app_id, name in app_name_map.items():
+    systems = global_apps_matrix.get(app_id, {"google": False, "canvas": False, "schoology": False})
+    
+    display_label = f"{name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
+    
+    gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
+    canvas_status = '<span class="ok">✅ Active</span>' if systems['canvas'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
+    schoology_status = '<span class="ok">✅ Active</span>' if systems['schoology'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
+    
+    apps_matrix_rows.append(f"""
+        <tr>
+            <td style="text-align:left; padding:12px; border-bottom:1px solid #f1f3f4; font-weight:600;">{display_label}</td>
+            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{gc_status}</td>
+            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{canvas_status}</td>
+            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
+        </tr>
+    """)
 
-# Clean overview metrics header card block ( escaped double-curly brackets to protect style rendering )
+apps_dropdown_html = f"""
+<details style="margin-bottom: 24px; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" open>
+    <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
+        <span>📦 Partner Application-Side LMS Matrix (Real-Time Flags)</span>
+        <span class="sum-count">{live_prod_apps_count} / {total_targeted_apps} Enabled</span>
+    </summary>
+    <div class="table-wrap" style="padding: 0 20px 20px; overflow-x: auto;">
+        <table style="width:100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px;">
+            <thead>
+                <tr style="background:#f1f3f4; color: #5f6368;">
+                    <th style="padding:12px; text-align:left;">Application Profile / ID</th>
+                    <th style="padding:12px; text-align:center;">Google Classroom</th>
+                    <th style="padding:12px; text-align:center;">Canvas</th>
+                    <th style="padding:12px; text-align:center;">Schoology</th>
+                </tr>
+            </thead>
+            <tbody>
+                {"".join(apps_matrix_rows) if apps_matrix_rows else '<tr><td colspan="4" style="text-align:center; padding:20px;">No application feature flags detected.</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+</details>
+"""
+
 apps_summary_block = f"""
 <div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -156,53 +211,3 @@ apps_summary_block = f"""
         </div>
     </div>
 </div>
-"""
-
-final_content = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>LMS Transition Tracker</title>
-    <style>
-        body {{ font-family: -apple-system, system-ui, sans-serif; background: #f4f7f9; padding: 40px; color: #202124; line-height: 1.5; }}
-        .container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }}
-        .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); width: 260px; text-align: center; border: 1px solid #e0e0e0; }}
-        .bar {{ background: #eee; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }}
-        .bar div {{ height: 100%; transition: width 1s; }}
-        .stats {{ font-size: 2.5em; font-weight: bold; }}
-        .app-warn {{ color:#d93025; font-size:11px; font-weight:bold; margin-top:5px; }}
-        
-        details {{ background: white; margin: 0 auto 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 1300px; border: 1px solid #e0e0e0; }}
-        summary {{ padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }}
-        .sum-count {{ background: #f1f3f4; padding: 2px 12px; border-radius: 12px; font-size: 0.85em; }}
-        
-        .table-wrap {{ padding: 0 20px 20px; overflow-x: auto; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px; }}
-        th, td {{ padding: 12px 10px; border-bottom: 1px solid #f1f3f4; vertical-align: top; }}
-        th {{ color: #5f6368; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px; }}
-        
-        .district-info {{ display: flex; flex-direction: column; gap: 4px; }}
-        .d-name {{ font-weight: 600; color: #202124; }}
-        .d-id {{ font-family: monospace; font-size: 0.8em; color: #9aa0a6; cursor: pointer; display: inline-block; }}
-        .d-id:hover {{ color: #1a73e8; text-decoration: underline; }}
-        
-        .app-cell {{ color: #5f6368; font-style: italic; max-width: 300px; word-wrap: break-word; }}
-        .bts-cell {{ font-weight: 500; color: #1a73e8; }}
-        .ok {{ color: #1e8e3e; font-weight: bold; }}
-        .no {{ color: #d93025; font-weight: bold; }}
-        .ts {{ text-align: center; color: #9aa0a6; font-size: 0.8em; margin-top: 50px; }}
-    </style>
-</head>
-<body>
-    <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
-    {apps_summary_block}
-    <div class="container">{cards_html}</div>
-    {dropdowns_html}
-    <div class="ts">Last Sync: {ts} (PT)</div>
-</body>
-</html>
-"""
-
-with open("index.html", "w", encoding="utf-8") as f:
-    f.write(final_content)
