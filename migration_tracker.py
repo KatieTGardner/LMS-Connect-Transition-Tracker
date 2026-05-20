@@ -14,6 +14,13 @@ LMS_CONFIGS = {
     "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
 }
 
+# HARDCODED APP MAP: Bypasses any external file requirements cleanly
+app_name_map = {
+    "64cbff9e498f330001ce6412": "My Ada Math",
+    "65b007468aeae2000126eedd": "My Ada Math (Dev)",
+    "5ef238e4d91c0a00010fe400": "Khan Academy"
+}
+
 def get_ld(flag):
     url = f"https://app.launchdarkly.com/api/v2/flags/default/{flag}"
     headers = {"Authorization": str(LD_TOKEN), "LD-API-Version": "beta"}
@@ -40,24 +47,15 @@ except Exception as e:
     print(f"CRITICAL ERROR: {e}")
     sys.exit(1)
 
-# Load the custom application tracker index list cleanly from the local repo file
-app_name_map = {}
-if os.path.exists("apps_list.txt"):
-    with open("apps_list.txt", "r", encoding="utf-8") as f:
-        for line in f:
-            if ":" in line:
-                parts = line.split(":", 1)
-                app_name_map[parts.strip().lower()] = parts.strip()
-
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
-total_targeted_apps = len(app_name_map) if len(app_name_map) > 0 else 34
+total_targeted_apps = 34 # Safeguarded baseline denominator count
 
 # Loop over the structural configurations to pull LaunchDarkly values
 for key, cfg in LMS_CONFIGS.items():
     ld_ids = get_ld(cfg['flag'])
     
-    # Process the active partner app matrix matches directly against the text file keys
+    # Process the active partner app matrix matches directly against the dictionary keys
     for app_id in app_name_map.keys():
         if app_id in ld_ids or f"app:{app_id}" in ld_ids or any(app_id in str(x) for x in ld_ids):
             if app_id not in global_apps_matrix:
@@ -146,7 +144,6 @@ app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if to
 apps_matrix_rows = []
 for app_id, name in app_name_map.items():
     systems = global_apps_matrix.get(app_id, {"google": False, "canvas": False, "schoology": False})
-    
     display_label = f"{name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
     
     gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
