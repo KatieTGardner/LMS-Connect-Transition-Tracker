@@ -61,8 +61,9 @@ global_apps_matrix = {}
 app_name_map = {}
 all_sheet_app_ids = set()
 all_sheet_district_ids = set()
+cached_districts_rows = {}
 
-# PHASE 1: Build the app name mapping dictionary from your spreadsheet tabs
+# PHASE 1: Build the app name mapping dictionary and parse spreadsheets FIRST
 for key, cfg in LMS_CONFIGS.items():
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
@@ -88,6 +89,7 @@ for key, cfg in LMS_CONFIGS.items():
 
     try:
         dist_rows = doc.worksheet(cfg['districts_tab']).get_all_records()
+        cached_districts_rows[key] = dist_rows
         for row in dist_rows:
             row_text = " ".join([str(v) for v in row.values() if v is not None])
             found_ids = ID_PATTERN.findall(row_text)
@@ -106,7 +108,7 @@ for key, cfg in LMS_CONFIGS.items():
     
     # Process app IDs (exclude strings recognized as districts)
     for hex_id in file_hexes:
-        if hex_id not in all_sheet_district_ids or hex_id in all_sheet_app_ids:
+        if hex_id not in all_sheet_district_ids or hex_id in all_sheet_app_ids or hex_id in ["64cbff9e498f330001ce6412", "65b007468aeae2000126eedd"]:
             if hex_id not in global_apps_matrix:
                 global_apps_matrix[hex_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[hex_id][key] = True
@@ -114,7 +116,7 @@ for key, cfg in LMS_CONFIGS.items():
 # PHASE 3: Process district tabs and generate layout cards and rosters
 for key, cfg in LMS_CONFIGS.items():
     try:
-        rows = doc.worksheet(cfg['districts_tab']).get_all_records()
+        rows = cached_districts_rows.get(key, [])
         file_hexes = get_raw_hex_ids_from_file(cfg['file'])
         
         districts_data = []
@@ -311,3 +313,7 @@ final_content = f"""
     <div class="ts">Last Sync: {ts} (PT)</div>
 </body>
 </html>
+"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(final_content)
