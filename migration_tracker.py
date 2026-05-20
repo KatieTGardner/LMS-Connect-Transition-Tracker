@@ -109,11 +109,6 @@ def get_ld_environment_state(flag_key):
             return state
 
         flag_response = res.json()
-
-        if DEBUG_LD:
-            print(f"\n===== RAW LD FLAG RESPONSE: {flag_key} =====")
-            print(json.dumps(flag_response, indent=2))
-
         env_data = flag_response.get("environments", {}).get(ENV, {})
         state["flag_on"] = bool(env_data.get("on", False))
 
@@ -141,12 +136,14 @@ def get_ld_environment_state(flag_key):
                 variations = rollout.get("variations", []) or []
 
                 true_rollout = any(
-                    variation_value(flag_response, v.get("variation")) is True and int(v.get("weight", 0)) >= 100000
+                    variation_value(flag_response, v.get("variation")) is True
+                    and int(v.get("weight", 0)) >= 100000
                     for v in variations
                 )
 
                 false_rollout = any(
-                    variation_value(flag_response, v.get("variation")) is False and int(v.get("weight", 0)) >= 100000
+                    variation_value(flag_response, v.get("variation")) is False
+                    and int(v.get("weight", 0)) >= 100000
                     for v in variations
                 )
 
@@ -224,6 +221,8 @@ except Exception as e:
 
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
+total_done_districts = 0
+total_scope_districts = 0
 
 ld_flags_cache = {key: get_ld_environment_state(cfg["flag"]) for key, cfg in LMS_CONFIGS.items()}
 
@@ -277,6 +276,9 @@ for key, cfg in LMS_CONFIGS.items():
         done_count = sum(1 for d in districts_data if d["done"])
         total = len(districts_data)
         pct = int((done_count / total) * 100) if total > 0 else 0
+
+        total_done_districts += done_count
+        total_scope_districts += total
 
         cards_html += f"""
         <div class="card">
@@ -341,6 +343,24 @@ for app_id, states in global_apps_matrix.items():
 
 live_prod_apps_count = len(deduped_live_apps)
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
+
+overall_done = live_prod_apps_count + total_done_districts
+overall_total = total_targeted_apps + total_scope_districts
+overall_pct = int((overall_done / overall_total) * 100) if overall_total > 0 else 0
+
+
+overall_progress_block = f"""
+<div class="overall-progress-block">
+    <div class="overall-label">Overall Project Progress</div>
+    <div class="overall-percent">{overall_pct}%</div>
+    <div class="overall-bar">
+        <div style="width:{overall_pct}%;"></div>
+    </div>
+    <div class="overall-subtext">
+        {overall_done} of {overall_total} total app + district transitions complete
+    </div>
+</div>
+"""
 
 
 apps_matrix_rows = []
@@ -489,6 +509,56 @@ final_content = f"""
             font-size: 0.8rem;
             margin-top: -20px;
             margin-bottom: 28px;
+        }}
+
+        .overall-progress-block {{
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            border-radius: 20px;
+            max-width: 1200px;
+            margin: 0 auto 32px auto;
+            padding: 36px 32px;
+            text-align: center;
+        }}
+
+        .overall-label {{
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 0.85rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }}
+
+        .overall-percent {{
+            color: #0f172a;
+            font-size: 5rem;
+            line-height: 1;
+            font-weight: 900;
+            margin-bottom: 20px;
+        }}
+
+        .overall-bar {{
+            background: #e5e7eb;
+            height: 16px;
+            border-radius: 999px;
+            overflow: hidden;
+            max-width: 760px;
+            margin: 0 auto 16px auto;
+        }}
+
+        .overall-bar div {{
+            height: 100%;
+            background: #10b981;
+            border-radius: 999px;
+            transition: width 1s ease;
+        }}
+
+        .overall-subtext {{
+            color: #475569;
+            font-size: 1rem;
+            font-weight: 600;
         }}
 
         .container {{
@@ -746,6 +816,7 @@ final_content = f"""
         Run Sync opens GitHub Actions. After the workflow completes, come back here and click Refresh Dashboard.
     </div>
 
+    {overall_progress_block}
     {apps_summary_block}
     {apps_dropdown_html}
     <div class="container">{cards_html}</div>
@@ -758,4 +829,4 @@ final_content = f"""
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(final_content)
 
-print(f"Dashboard generated successfully. Apps active: {live_prod_apps_count}/{total_targeted_apps}")
+print(f"Dashboard generated successfully. Overall progress: {overall_pct}%. Apps active: {live_prod_apps_count}/{total_targeted_apps}")
