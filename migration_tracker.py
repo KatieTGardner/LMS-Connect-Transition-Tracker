@@ -73,31 +73,55 @@ for key, cfg in LMS_CONFIGS.items():
                 global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
             global_apps_matrix[clean_id][key] = True
 
-# Loop 2: Robust matching that handles column name whitespace variants
+# --- Loop 2: LEARN NAME MAPPINGS WITH DIAGNOSTIC LOGGING ---
+print("\n=== STARTING SPREADSHEET ANALYSIS ===")
 for key, cfg in LMS_CONFIGS.items():
     try:
+        print(f"\nProcessing Sheet Tab: {cfg['apps_tab']}")
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
-        for row in app_rows:
-            # Normalize headers by removing casing and spaces to find the right column
-            normalized_row = {str(k).strip().lower().replace(" ", ""): v for k, v in row.items()}
+        
+        if not app_rows:
+            print(f"⚠️ Warning: Tab {cfg['apps_tab']} returned zero rows.")
+            continue
             
+        print(f"Found {len(app_rows)} rows. Raw column headers: {list(app_rows.keys())}")
+        
+        for idx, row in enumerate(app_rows):
             raw_name = ""
-            for k, v in row.items():
-                if "appname" in str(k).lower().replace(" ", ""):
-                    raw_name = str(v).strip()
-            
             raw_id = ""
+            
+            # 1. Isolate the true App Name column safely
             for k, v in row.items():
                 norm_k = str(k).lower().replace(" ", "").replace("_", "")
-                if "prodappid" in norm_k or "appid" in norm_k:
+                if "appname" in norm_k:
+                    raw_name = str(v).strip()
+            
+            # 2. Strict ID matching: Prioritize 'prodappid', avoid 'testing' or 'sandbox'
+            for k, v in row.items():
+                norm_k = str(k).lower().replace(" ", "").replace("_", "")
+                if "prodappid" in norm_k:
+                    raw_id = str(v).strip()
+                    break # Perfect match found
+                elif "appid" in norm_k and "test" not in norm_k and "sand" not in norm_k:
                     raw_id = str(v).strip()
 
-            if raw_name and raw_id:
-                app_name_map[raw_id] = raw_name
-                if raw_id not in global_apps_matrix:
-                    global_apps_matrix[raw_id] = {"google": False, "canvas": False, "schoology": False}
+            # Logging evaluation output for rows containing data
+            if raw_name or raw_id:
+                if len(raw_id) == 24: # Enforce standard MongoDB Hex ID length check
+                    app_name_map[raw_id] = raw_name
+                    if raw_id not in global_apps_matrix:
+                        global_apps_matrix[raw_id] = {"google": False, "canvas": False, "schoology": False}
+                else:
+                    print(f"⚠️ Row {idx+2}: Skipped invalid or empty Hex ID string: '{raw_id}' for App: '{raw_name}'")
+                    
     except Exception as e:
-        print(f"Notice: Could not parse apps mapping tab {cfg['apps_tab']}: {e}")
+        print(f"❌ Error parsing apps mapping tab {cfg['apps_tab']}: {e}")
+
+print("\n=== VERIFYING FINAL MASTER DICTIONARY POOL ===")
+print(f"Total Unique Apps Mapped: {len(app_name_map)}")
+print(f"Parsed Application Map Profiles: {json.dumps(app_name_map, indent=2)}")
+print(f"Current LaunchDarkly Active Flag Matrix: {json.dumps(global_apps_matrix, indent=2)}")
+print("============================================\n")
 
 # Loop 3: Process districts data rosters
 for key, cfg in LMS_CONFIGS.items():
