@@ -30,11 +30,11 @@ LMS_CONFIGS = {
     }
 }
 
-# Regex to safely catch any 24-character hex ID string anywhere in files or rows
+# Universal regex pattern to isolate any valid 24-character hexadecimal MongoDB/Clever Object ID
 ID_PATTERN = re.compile(r'\b([a-fA-F0-9]{24})\b')
 
 def get_raw_hex_ids_from_file(filename):
-    """Scrapes all valid 24-character hex strings found inside a file."""
+    """Scrapes any valid 24-character hex string found inside a file line stream."""
     found_ids = set()
     if os.path.exists(filename):
         try:
@@ -44,7 +44,7 @@ def get_raw_hex_ids_from_file(filename):
                 for m in matches:
                     found_ids.add(m.strip().lower())
         except Exception as e:
-            print(f"Error reading target file {filename}: {e}")
+            print(f"Error reading local file {filename}: {e}")
     return found_ids
 
 # --- 2. AUTH & INITIALIZATION ---
@@ -59,22 +59,16 @@ except Exception as e:
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
 app_name_map = {}
+all_known_app_ids = set()
 
-all_sheet_app_ids = set()
-all_sheet_district_ids = set()
-tab_district_data_cache = {}
-
-# --- STEP 1: PARSE GOOGLE SPREADSHEETS FIRST ---
+# --- STEP 1: PARSE THE MASTER APP NAME LOOKUP MAPS ---
 for key, cfg in LMS_CONFIGS.items():
-    # A. Build clean Application indices from your Apps tab
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
         for row in app_rows:
-            # Look inside every column cell string for hex ids
             row_str = " ".join([str(v) for v in row.values() if v is not None])
             found_ids = ID_PATTERN.findall(row_str)
             
-            # Extract the correct friendly app name text
             app_name = ""
             for k, v in row.items():
                 if "name" in str(k).lower().replace(" ", ""):
@@ -85,121 +79,113 @@ for key, cfg in LMS_CONFIGS.items():
                 
             for hid in found_ids:
                 clean_id = hid.lower().strip()
-                all_sheet_app_ids.add(clean_id)
+                all_known_app_ids.add(clean_id)
                 if app_name:
                     app_name_map[clean_id] = app_name
     except Exception as e:
-        print(f"Notice: Skipping apps tab {cfg['apps_tab']}: {e}")
+        print(f"Notice: Caching skipped on apps lookup tab {cfg['apps_tab']}: {e}")
 
-    # B. Build clean District indices from your Districts tab
-    try:
-        dist_rows = doc.worksheet(cfg['districts_tab']).get_all_records()
-        tab_district_data_cache[key] = dist_rows
-        for row in dist_rows:
-            row_str = " ".join([str(v) for v in row.values() if v is not None])
-            found_ids = ID_PATTERN.findall(row_str)
-            for hid in found_ids:
-                all_sheet_district_ids.add(hid.lower().strip())
-    except Exception as e:
-        print(f"Notice: Skipping districts tab {cfg['districts_tab']}: {e}")
-
-# Hardcoded engineering fallback map to catch the My Ada Math prod hex if missing from sheets
+# Safety system overrides to protect core engineering records from spreadsheet string drops
 app_name_map["64cbff9e498f330001ce6412"] = "My Ada Math"
-all_sheet_app_ids.add("64cbff9e498f330001ce6412")
+app_name_map["65b007468aeae2000126eedd"] = "My Ada Math (Dev)"
+all_known_app_ids.add("64cbff9e498f330001ce6412")
+all_known_app_ids.add("65b007468aeae2000126eedd")
 
-# --- STEP 2: COMPILE THE CROSS-REFERENCED PARTNER APPLICATION MATRIX ---
+# --- STEP 2: COMPILE THE GLOBAL APPLICATION STATUS MATRIX ---
 for key, cfg in LMS_CONFIGS.items():
     file_hexes = get_raw_hex_ids_from_file(cfg['file'])
     
-    # Cross-Reference Step: Match IDs present in the .txt file with valid app IDs from your sheet
-    app_hexes_in_file = file_hexes.intersection(all_sheet_app_ids)
-    
-    for clean_id in app_hexes_in_file:
-        if clean_id not in global_apps_matrix:
-            global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
-        global_apps_matrix[clean_id][key] = True
+    # Identify app targets by scanning lines containing explicit app-prefixes or matching master keys
+    for hex_id in file_hexes:
+        if hex_id in all_known_app_ids:
+            if hex_id not in global_apps_matrix:
+                global_apps_matrix[hex_id] = {"google": False, "canvas": False, "schoology": False}
+            global_apps_matrix[hex_id][key] = True
 
 # --- STEP 3: ASSEMBLE HIGH-LEVEL DISTRICT CARDS & ROSTERS ---
 for key, cfg in LMS_CONFIGS.items():
-    rows = tab_district_data_cache.get(key, [])
-    file_hexes = get_raw_hex_ids_from_file(cfg['file'])
-    
-    # Cross-Reference Step: Match IDs present in the .txt file with valid district IDs from your sheet
-    ld_district_hexes = file_hexes.intersection(all_sheet_district_ids)
-    apps_ok = len(file_hexes.intersection(all_sheet_app_ids)) > 0
-    
-    districts_data = []
-    for r in rows:
-        row_str = " ".join([str(v) for v in r.values() if v is not None])
-        district_hexes = ID_PATTERN.findall(row_str)
+    try:
+        rows = doc.worksheet(cfg['districts_tab']).get_all_records()
+        file_hexes = get_raw_hex_ids_from_file(cfg['file'])
         
-        rid = district_hexes.lower().strip() if district_hexes else str(r.get('District Id', '')).strip().lower()
-        d_name = r.get('District Name', rid)
+        # Filter out application keys to accurately isolate school district targets
+        ld_district_hexes = {hid for hid in file_hexes if hid not in all_known_app_ids}
+        apps_ok = len(file_hexes.intersection(all_known_app_ids)) > 0
         
-        raw_apps = str(r.get('Connected Apps', '')).strip()
-        app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
-        formatted_apps = ", ".join(app_list) if app_list else "None"
+        districts_data = []
+        for r in rows:
+            row_str = " ".join([str(v) for v in r.values() if v is not None])
+            district_hexes = ID_PATTERN.findall(row_str)
+            
+            rid = district_hexes.lower().strip() if district_hexes else str(r.get('District Id', '')).strip().lower()
+            d_name = r.get('District Name', rid)
+            
+            raw_apps = str(r.get('Connected Apps', '')).strip()
+            app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
+            formatted_apps = ", ".join(app_list) if app_list else "None"
+            
+            is_done = rid in ld_district_hexes if rid else False
+            districts_data.append({
+                "id": rid, 
+                "name": d_name, 
+                "segment": r.get('Segment', 'N/A'), 
+                "csm": r.get('CSM Name', 'N/A'), 
+                "apps": formatted_apps,
+                "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
+                "done": is_done
+            })
+            
+        done_count = sum(1 for d in districts_data if d['done'])
+        total = len(districts_data)
+        pct = int((done_count/total)*100) if total > 0 else 0
+        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
         
-        is_done = rid in ld_district_hexes if rid else False
-        districts_data.append({
-            "id": rid, 
-            "name": d_name, 
-            "segment": r.get('Segment', 'N/A'), 
-            "csm": r.get('CSM Name', 'N/A'), 
-            "apps": formatted_apps,
-            "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
-            "done": is_done
-        })
+        cards_html += f"""
+        <div class="card">
+            <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
+            <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
+            <div class="stats">{pct}%</div>
+            <p><b>{done_count}</b> / {total} Districts</p>
+            {warn}
+        </div>"""
         
-    done_count = sum(1 for d in districts_data if d['done'])
-    total = len(districts_data)
-    pct = int((done_count/total)*100) if total > 0 else 0
-    warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
-    
-    cards_html += f"""
-    <div class="card">
-        <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
-        <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
-        <div class="stats">{pct}%</div>
-        <p><b>{done_count}</b> / {total} Districts</p>
-        {warn}
-    </div>"""
-    
-    rows_html = "".join([f"""
-        <tr>
-            <td>
-                <div class="district-info">
-                    <span class="d-name">{d['name']}</span>
-                    <span class="d-id" onclick="navigator.clipboard.writeText('{d['id']}');alert('ID Copied!');">ID: {d['id']}</span>
-                </div>
-            </td>
-            <td>{d['segment']}</td>
-            <td>{d['csm']}</td>
-            <td class="app-cell">{d['apps']}</td>
-            <td class="bts-cell">{d['bts']}</td>
-            <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
-        </tr>""" for d in sorted(districts_data, key=lambda x: x['name'])])
-    
-    dropdowns_html += f"""
-    <details>
-        <summary style="border-left: 5px solid {cfg['color']};">
-            <span>{cfg['title']} Detailed Roster</span>
-            <span class="sum-count">{done_count} / {total}</span>
-        </summary>
-        <div class="table-wrap">
-            <table>
-                <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
-                <tbody>{rows_html if rows_html else '<tr><td colspan="6">No data found in sheet.</td></tr>'}</tbody>
-            </table>
-        </div>
-    </details>"""
+        rows_html = "".join([f"""
+            <tr>
+                <td>
+                    <div class="district-info">
+                        <span class="d-name">{d['name']}</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('{d['id']}');alert('ID Copied!');">ID: {d['id']}</span>
+                    </div>
+                </td>
+                <td>{d['segment']}</td>
+                <td>{d['csm']}</td>
+                <td class="app-cell">{d['apps']}</td>
+                <td class="bts-cell">{d['bts']}</td>
+                <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
+            </tr>""" for d in sorted(districts_data, key=lambda x: x['name'])])
+        
+        dropdowns_html += f"""
+        <details>
+            <summary style="border-left: 5px solid {cfg['color']};">
+                <span>{cfg['title']} Detailed Roster</span>
+                <span class="sum-count">{done_count} / {total}</span>
+            </summary>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                    <tbody>{rows_html if rows_html else '<tr><td colspan="6">No data found in sheet.</td></tr>'}</tbody>
+                </table>
+            </div>
+        </details>"""
+    except Exception as e:
+        print(f"Error on district tab loop execution {cfg['districts_tab']}: {e}")
 
-# Dynamic application metrics logic metrics calculation formulas
+# Calculate application metrics counters 
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
-total_targeted_apps = len(all_sheet_app_ids) if len(all_sheet_app_ids) > 0 else 34
+total_targeted_apps = len(all_known_app_ids) if len(all_known_app_ids) > 0 else 34
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- STEP 4: INTERFACE RENDER COMPONENT ROWS ---
+# --- STEP 4: INTERFACE HTML GRID COMPONENT ASSEMBLY ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
     clean_key = app_id.lower().strip()
@@ -252,7 +238,7 @@ apps_summary_block = f"""
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
             <h2 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">Partner Applications Migration Status</h2>
-            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks flag readiness rules completely cross-referenced against master spreadsheet indexes.</p>
+            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks flag readiness rules cross-referenced against master spreadsheet indexes.</p>
         </div>
         <div style="display: flex; gap: 40px; align-items: center;">
             <div style="text-align: center;">
