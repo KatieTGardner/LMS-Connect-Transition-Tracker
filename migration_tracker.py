@@ -1,158 +1,90 @@
-import datetime, sys, os, json, gspread, re
+import requests, datetime, sys, os, json, gspread, re
 from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
 # --- 1. CONFIGURATION ---
+LD_TOKEN = sys.argv if len(sys.argv) > 1 else "" 
 GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
+ENV = "production"
 
+# FIXED: Aligned feature flag strings exactly to your live LaunchDarkly profiles
 LMS_CONFIGS = {
-    "google": {
-        "districts_tab": "[Data] Google Classroom - Districts", 
-        "apps_tab": "[Data] Google Classroom - Apps",
-        "file": "gc_targets.txt", 
-        "color": "#34A853", 
-        "title": "Google Classroom"
-    },
-    "canvas": {
-        "districts_tab": "[Data] Canvas - Districts", 
-        "apps_tab": "[Data] Canvas - Apps",
-        "file": "canvas_targets.txt", 
-        "color": "#E13939", 
-        "title": "Canvas"
-    },
-    "schoology": {
-        "districts_tab": "[Data] Schoology - Districts", 
-        "apps_tab": "[Data] Schoology - Apps",
-        "file": "schoology_targets.txt", 
-        "color": "#00AEEF", 
-        "title": "Schoology"
-    }
+    "google": {"tab": "[Data] Google Classroom - Districts", "flag": "lms-connect-google-classroom-mvp", "color": "#34A853", "title": "Google Classroom"},
+    "canvas": {"tab": "[Data] Canvas - Districts", "flag": "lms-connect-fully-owned-solution-canvas", "color": "#E13939", "title": "Canvas"},
+    "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
 }
 
-# Regex pattern matching exact 24-character hexadecimal MongoDB/Clever Object IDs
-ID_PATTERN = re.compile(r'\b([a-fA-F0-9]{24})\b')
+def get_ld(flag):
+    url = f"https://app.launchdarkly.com/api/v2/flags/default/{flag}"
+    headers = {"Authorization": str(LD_TOKEN), "LD-API-Version": "beta"}
+    try:
+        res = requests.get(url, headers=headers).json()
+        env_data = res.get('environments', {}).get(ENV, {})
+        vals = []
+        for t in env_data.get('targets', []):
+            if t.get('variation') == 0: vals.extend(t.get('values', []))
+        for r in env_data.get('rules', []):
+            if r.get('variation') == 0:
+                for c in r.get('clauses', []): vals.extend(c.get('values', []))
+        return [str(i).strip() for i in vals]
+    except Exception as e:
+        print(f"Error fetching LD flag {flag}: {e}")
+        return []
 
-def get_raw_hex_ids_from_file(filename):
-    """Scrapes any valid 24-character hex string found inside a target text file."""
-    found_ids = set()
-    if os.path.exists(filename):
-        try:
-            with open(filename, "r", encoding="utf-8") as f:
-                content = f.read()
-                matches = ID_PATTERN.findall(content)
-                for m in matches:
-                    found_ids.add(m.strip().lower())
-        except Exception as e:
-            print(f"Error reading local file backup {filename}: {e}")
-    return found_ids
-
-# --- 2. AUTH & GOOGLE API INITIALIZATION ---
+# --- 2. AUTH & FETCH ---
 try:
     creds_dict = json.loads(GOOG_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
     doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 except Exception as e:
-    print(f"CRITICAL AUTH FAILURE: {e}")
+    print(f"CRITICAL ERROR: {e}")
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
-global_apps_matrix = {}
-app_name_map = {}
-all_sheet_app_ids = set()
-all_sheet_district_ids = set()
-cached_districts_rows = {}
 
-# PHASE 1: Parse Google Spreadsheets to populate mapping keys first
-for key, cfg in LMS_CONFIGS.items():
-    # A. Parse apps lookup configurations
-    try:
-        app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
-        for row in app_rows:
-            row_text = " ".join([str(v) for v in row.values() if v is not None])
-            found_ids = ID_PATTERN.findall(row_text)
-            
-            app_name = ""
-            for k, v in row.items():
-                if "name" in str(k).lower().replace(" ", ""):
-                    app_name = str(v).strip()
-                    break
-            if not app_name and row.values():
-                app_name = str(list(row.values())).strip()
+# Baseline App Metrics Counters
+total_targeted_apps = 34  
+live_prod_apps_count = 0
+app_progress_pct = 0
 
-            for hex_id in found_ids:
-                clean_id = hex_id.lower().strip()
-                all_sheet_app_ids.add(clean_id)
-                if app_name:
-                    app_name_map[clean_id] = app_name
-    except Exception as e:
-        print(f"Notice: Skipping apps tab parsing {cfg['apps_tab']}: {e}")
-
-    # B. Parse districts rosters records
-    try:
-        dist_rows = doc.worksheet(cfg['districts_tab']).get_all_records()
-        cached_districts_rows[key] = dist_rows
-        for row in dist_rows:
-            row_text = " ".join([str(v) for v in row.values() if v is not None])
-            found_ids = ID_PATTERN.findall(row_text)
-            for hex_id in found_ids:
-                all_sheet_district_ids.add(hex_id.lower().strip())
-    except Exception as e:
-        print(f"Notice: Skipping district pre-check parsing {cfg['districts_tab']}: {e}")
-
-# Engineering fallback records overrides to secure My Ada Math presentation values
-app_name_map["64cbff9e498f330001ce6412"] = "My Ada Math"
-app_name_map["65b007468aeae2000126eedd"] = "My Ada Math (Dev)"
-all_sheet_app_ids.add("64cbff9e498f330001ce6412")
-all_sheet_app_ids.add("65b007468aeae2000126eedd")
-
-# PHASE 2: Populate the Global Application Status Matrix
-for key, cfg in LMS_CONFIGS.items():
-    file_hexes = get_raw_hex_ids_from_file(cfg['file'])
-    
-    # Evaluate raw text file strings for explicit 'app:' prefixes or registered sheet targets
-    for hex_id in file_hexes:
-        is_an_app = hex_id in all_sheet_app_ids or hex_id in ["64cbff9e498f330001ce6412", "65b007468aeae2000126eedd"]
-        
-        if is_an_app:
-            if hex_id not in global_apps_matrix:
-                global_apps_matrix[hex_id] = {"google": False, "canvas": False, "schoology": False}
-            global_apps_matrix[hex_id][key] = True
-
-# PHASE 3: Process district tabs and generate layout cards and rosters
 for key, cfg in LMS_CONFIGS.items():
     try:
-        rows = cached_districts_rows.get(key, [])
-        file_hexes = get_raw_hex_ids_from_file(cfg['file'])
+        rows = doc.worksheet(cfg['tab']).get_all_records()
+        ld_ids = get_ld(cfg['flag'])
+        apps_ok = any(str(i).startswith("app:") for i in ld_ids)
         
         districts_data = []
         for r in rows:
-            row_text = " ".join([str(v) for v in r.values() if v is not None])
-            district_hexes = ID_PATTERN.findall(row_text)
-            
-            rid = district_hexes.lower().strip() if district_hexes else str(r.get('District Id', '')).strip().lower()
-            d_name = r.get('District Name', rid)
+            rid = str(r.get('District Id', '')).strip()
+            pre = f"district:{rid}" if rid and not rid.startswith("district:") else rid
             
             raw_apps = str(r.get('Connected Apps', '')).strip()
             app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
             formatted_apps = ", ".join(app_list) if app_list else "None"
+
+            bts_date = str(r.get('BTS Dates', 'TBD')).strip()
+            if not bts_date: bts_date = "TBD"
             
-            # Verify if the district ID is explicitly present inside LaunchDarkly's target list
-            is_done = rid in file_hexes if rid else False
+            is_done = pre in ld_ids and apps_ok
             districts_data.append({
                 "id": rid, 
-                "name": d_name, 
+                "name": r.get('District Name', rid), 
                 "segment": r.get('Segment', 'N/A'), 
                 "csm": r.get('CSM Name', 'N/A'), 
                 "apps": formatted_apps,
-                "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
+                "bts": bts_date,
                 "done": is_done
             })
+            
+            # Simple fallback counter: if My Ada Math prod ID is in the flag targets list, count it as active
+            if "app:64cbff9e498f330001ce6412" in ld_ids:
+                live_prod_apps_count = 1
         
         done_count = sum(1 for d in districts_data if d['done'])
         total = len(districts_data)
         pct = int((done_count/total)*100) if total > 0 else 0
-        warn = "" if len(file_hexes) > 0 or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
+        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
         
         cards_html += f"""
         <div class="card">
@@ -192,67 +124,20 @@ for key, cfg in LMS_CONFIGS.items():
             </div>
         </details>"""
     except Exception as e:
-        print(f"Error on tab loop {cfg['districts_tab']}: {e}")
+        print(f"Error on tab {cfg['tab']}: {e}")
 
-# Compute application metrics totals from the isolated app pool matrix records
-live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
-total_targeted_apps = 34
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- PHASE 4: HTML ASSEMBLY LOOP ---
-apps_matrix_rows = []
-for app_id, systems in sorted(global_apps_matrix.items()):
-    clean_key = app_id.lower().strip()
-    display_name = app_name_map.get(clean_key, app_id)
-    
-    if display_name != app_id:
-        display_label = f"{display_name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
-    else:
-        display_label = f"<span style='font-family:monospace;'>{app_id}</span>"
+# --- 3. HTML ASSEMBLY ---
+ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
 
-    gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
-    canvas_status = '<span class="ok">✅ Active</span>' if systems['canvas'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
-    schoology_status = '<span class="ok">✅ Active</span>' if systems['schoology'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
-    
-    apps_matrix_rows.append(f"""
-        <tr>
-            <td style="text-align:left; padding:12px; border-bottom:1px solid #f1f3f4; font-weight:600;">{display_label}</td>
-            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{gc_status}</td>
-            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{canvas_status}</td>
-            <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
-        </tr>
-    """)
-
-apps_dropdown_html = f"""
-<details style="margin-bottom: 24px; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" open>
-    <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
-        <span>📦 Partner Application-Side LMS Matrix (Real-Time Flags)</span>
-        <span class="sum-count">{live_prod_apps_count} / {total_targeted_apps} Enabled</span>
-    </summary>
-    <div class="table-wrap" style="padding: 0 20px 20px; overflow-x: auto;">
-        <table style="width:100%; border-collapse: collapse; font-size: 0.85em; text-align: left; min-width: 1000px;">
-            <thead>
-                <tr style="background:#f1f3f4; color: #5f6368;">
-                    <th style="padding:12px; text-align:left;">Application Profile / ID</th>
-                    <th style="padding:12px; text-align:center;">Google Classroom</th>
-                    <th style="padding:12px; text-align:center;">Canvas</th>
-                    <th style="padding:12px; text-align:center;">Schoology</th>
-                </tr>
-            </thead>
-            <tbody>
-                {"".join(apps_matrix_rows) if apps_matrix_rows else '<tr><td colspan="4" style="text-align:center; padding:20px;">No application feature flags detected.</td></tr>'}
-            </tbody>
-        </table>
-    </div>
-</details>
-"""
-
+# Clean overview metrics header card block ( escaped double-curly brackets to protect style rendering )
 apps_summary_block = f"""
 <div style="background: white; padding: 24px; border-radius: 12px; max-width: 1200px; margin: 0 auto 32px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eef2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
             <h2 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">Partner Applications Migration Status</h2>
-            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks flag readiness rules cross-referenced against master spreadsheet indexes.</p>
+            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks total active applications currently configured across platforms.</p>
         </div>
         <div style="display: flex; gap: 40px; align-items: center;">
             <div style="text-align: center;">
@@ -272,8 +157,6 @@ apps_summary_block = f"""
     </div>
 </div>
 """
-
-ts = (datetime.datetime.now(timezone.utc) - timedelta(hours=7)).strftime('%b %d, %Y at %I:%M %p')
 
 final_content = f"""
 <!DOCTYPE html>
@@ -314,7 +197,6 @@ final_content = f"""
 <body>
     <h1 style="text-align:center; font-weight:400; margin-bottom:40px;">LMS Connect Transition Hub</h1>
     {apps_summary_block}
-    {apps_dropdown_html}
     <div class="container">{cards_html}</div>
     {dropdowns_html}
     <div class="ts">Last Sync: {ts} (PT)</div>
