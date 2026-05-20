@@ -6,7 +6,6 @@ from datetime import timezone, timedelta
 GOOG_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT')
 SHEET_ID = "1EtXGPq3cb1vGzbdMs--gibZkRExKmyQab9Yc82uA9Fg"
 
-# Mapped precisely to read your repository's local target backup dump text files
 LMS_CONFIGS = {
     "google": {
         "districts_tab": "[Data] Google Classroom - Districts", 
@@ -31,65 +30,49 @@ LMS_CONFIGS = {
     }
 }
 
-# Regex to catch raw 24-character hex strings securely
+# Core regex matching exact 24-character hexadecimal MongoDB Object ID keys
 ID_PATTERN = re.compile(r'\b([a-fA-F0-9]{24})\b')
 
-def get_filtered_local_ids(filename, target_type="district"):
-    """Reads raw target rules from files and isolates IDs by type syntax context."""
+def get_raw_hex_ids_from_file(filename):
+    """Scrapes any valid 24-character hex ID string found inside a file."""
     found_ids = set()
-    if not os.path.exists(filename):
-        return list(found_ids)
-        
-    try:
-        with open(filename, "r", encoding="utf-8") as f:
-            for line in f:
-                matches = ID_PATTERN.findall(line)
-                if not matches:
-                    continue
-                    
-                line_lower = line.lower()
+    if os.path.exists(filename):
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                content = f.read()
+                matches = ID_PATTERN.findall(content)
                 for m in matches:
-                    clean_id = m.strip().lower() # Enforce casing consistency
-                    
-                    # Explicit context prefix validation matching
-                    if f"app:{clean_id}" in line_lower:
-                        if target_type == "app":
-                            found_ids.add(clean_id)
-                    elif f"district:{clean_id}" in line_lower:
-                        if target_type == "district":
-                            found_ids.add(clean_id)
-                    # Line context semantic routing rule logic fallbacks
-                    else:
-                        if target_type == "app" and ("app" in line_lower or "partner" in line_lower):
-                            found_ids.add(clean_id)
-                        elif target_type == "district" and ("district" in line_lower or "school" in line_lower):
-                            found_ids.add(clean_id)
-    except Exception as e:
-        print(f"Error parsing classifications in {filename}: {e}")
-        
-    return list(found_ids)
+                    found_ids.add(m.strip().lower())
+        except Exception as e:
+            print(f"Error reading raw target logs file {filename}: {e}")
+    return found_ids
 
-# --- 2. AUTH & GOOGLE API INITIALIZATION ---
+# --- 2. AUTH & INITIALIZATION ---
 try:
     creds_dict = json.loads(GOOG_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
     doc = gspread.authorize(creds).open_by_key(SHEET_ID)
 except Exception as e:
-    print(f"CRITICAL AUTH FAILURE: {e}")
+    print(f"CRITICAL AUTH ERROR: {e}")
     sys.exit(1)
 
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
 app_name_map = {}
-total_targeted_apps = 34  
 
-# PHASE 1: Build the app name mapping dictionary from your spreadsheet tabs
+# Master index groups to perfectly cross-reference our IDs
+all_sheet_app_ids = set()
+all_sheet_district_ids = set()
+tab_district_data_cache = {}
+
+# --- STEP 1: PARSE ALL SPREADSHEET TABS FIRST ---
 for key, cfg in LMS_CONFIGS.items():
+    # A. Pull App Names and IDs from the App Tabs
     try:
         app_rows = doc.worksheet(cfg['apps_tab']).get_all_records()
         for row in app_rows:
-            row_text = " ".join([str(v) for v in row.values() if v is not None])
-            found_ids = ID_PATTERN.findall(row_text)
+            row_str = " ".join([str(v) for v in row.values() if v is not None])
+            found_ids = ID_PATTERN.findall(row_str)
             
             app_name = ""
             for k, v in row.items():
@@ -98,112 +81,129 @@ for key, cfg in LMS_CONFIGS.items():
                     break
             if not app_name and row.values():
                 app_name = str(list(row.values())).strip()
-
-            for hex_id in found_ids:
-                clean_id = hex_id.lower().strip() # CRITICAL FIX: Standardize map index key to lowercase
-                if app_name and len(clean_id) == 24:
+                
+            for hid in found_ids:
+                clean_id = hid.lower().strip()
+                all_sheet_app_ids.add(clean_id)
+                if app_name:
                     app_name_map[clean_id] = app_name
     except Exception as e:
-        print(f"Notice: Skipping name map caching on tab {cfg['apps_tab']}: {e}")
+        print(f"Notice: Skipping apps lookup tab {cfg['apps_tab']}: {e}")
 
-# PHASE 2: Build the global application status matrix from your local app-filtered target profiles
-for key, cfg in LMS_CONFIGS.items():
-    active_app_hexes = get_filtered_local_ids(cfg['file'], target_type="app")
-    for hex_id in active_app_hexes:
-        clean_hex = hex_id.lower().strip()
-        if clean_hex not in global_apps_matrix:
-            global_apps_matrix[clean_hex] = {"google": False, "canvas": False, "schoology": False}
-        global_apps_matrix[clean_hex][key] = True
-
-# PHASE 3: Loop over district sheets and populate regional tracker profiles
-for key, cfg in LMS_CONFIGS.items():
+    # B. Cache District Records and extract their structural IDs
     try:
-        rows = doc.worksheet(cfg['districts_tab']).get_all_records()
-        ld_district_hexes = get_filtered_local_ids(cfg['file'], target_type="district")
-        apps_ok = len(get_filtered_local_ids(cfg['file'], target_type="app")) > 0
-        
-        districts_data = []
-        for r in rows:
-            row_text = " ".join([str(v) for v in r.values() if v is not None])
-            district_hexes = ID_PATTERN.findall(row_text)
-            
-            rid = district_hexes if district_hexes else str(r.get('District Id', '')).strip()
-            d_name = r.get('District Name', rid)
-            
-            raw_apps = str(r.get('Connected Apps', '')).strip()
-            app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
-            formatted_apps = ", ".join(app_list) if app_list else "None"
-            
-            # Enforce case sanitation to guarantee district flag evaluations function perfectly
-            is_done = rid.lower().strip() in ld_district_hexes if rid else False
-            districts_data.append({
-                "id": rid, 
-                "name": d_name, 
-                "segment": r.get('Segment', 'N/A'), 
-                "csm": r.get('CSM Name', 'N/A'), 
-                "apps": formatted_apps,
-                "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
-                "done": is_done
-            })
-        
-        done_count = sum(1 for d in districts_data if d['done'])
-        total = len(districts_data)
-        pct = int((done_count/total)*100) if total > 0 else 0
-        warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
-        
-        cards_html += f"""
-        <div class="card">
-            <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
-            <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
-            <div class="stats">{pct}%</div>
-            <p><b>{done_count}</b> / {total} Districts</p>
-            {warn}
-        </div>"""
-        
-        rows_html = "".join([f"""
-            <tr>
-                <td>
-                    <div class="district-info">
-                        <span class="d-name">{d['name']}</span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('{d['id']}');alert('ID Copied!');">ID: {d['id']}</span>
-                    </div>
-                </td>
-                <td>{d['segment']}</td>
-                <td>{d['csm']}</td>
-                <td class="app-cell">{d['apps']}</td>
-                <td class="bts-cell">{d['bts']}</td>
-                <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
-            </tr>""" for d in sorted(districts_data, key=lambda x: x['name'])])
-        
-        dropdowns_html += f"""
-        <details>
-            <summary style="border-left: 5px solid {cfg['color']};">
-                <span>{cfg['title']} Detailed Roster</span>
-                <span class="sum-count">{done_count} / {total}</span>
-            </summary>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
-                    <tbody>{rows_html if rows_html else '<tr><td colspan="6">No data found in sheet.</td></tr>'}</tbody>
-                </table>
-            </div>
-        </details>"""
+        dist_rows = doc.worksheet(cfg['districts_tab']).get_all_records()
+        tab_district_data_cache[key] = dist_rows
+        for row in dist_rows:
+            row_str = " ".join([str(v) for v in row.values() if v is not None])
+            found_ids = ID_PATTERN.findall(row_str)
+            for hid in found_ids:
+                all_sheet_district_ids.add(hid.lower().strip())
     except Exception as e:
-        print(f"Error handling UI block rendering on {cfg['districts_tab']}: {e}")
+        print(f"Notice: Skipping districts tab cache step {cfg['districts_tab']}: {e}")
 
-# Compute application metrics totals cleanly from the isolated app pool matrix records
+# --- STEP 2: COMPILE THE GLOBAL APPLICATION STATUS MATRIX ---
+for key, cfg in LMS_CONFIGS.items():
+    file_hexes = get_raw_hex_ids_from_file(cfg['file'])
+    
+    # Cross-reference step: Isolate the real application IDs
+    app_hexes_in_file = file_hexes.intersection(all_sheet_app_ids)
+    
+    # Custom fallback rule for the My Ada Math ID if it's missing from the apps sheet tab
+    if "64cbff9e498f330001ce6412" in file_hexes:
+        app_hexes_in_file.add("64cbff9e498f330001ce6412")
+        app_name_map["64cbff9e498f330001ce6412"] = "My Ada Math"
+        
+    for clean_id in app_hexes_in_file:
+        if clean_id not in global_apps_matrix:
+            global_apps_matrix[clean_id] = {"google": False, "canvas": False, "schoology": False}
+        global_apps_matrix[clean_id][key] = True
+
+# --- STEP 3: ASSEMBLE HIGH-LEVEL DISTRICT METRICS & TABLES ---
+for key, cfg in LMS_CONFIGS.items():
+    rows = tab_district_data_cache.get(key, [])
+    file_hexes = get_raw_hex_ids_from_file(cfg['file'])
+    
+    # Cross-reference step: Isolate the real district IDs
+    ld_district_hexes = file_hexes.intersection(all_sheet_district_ids)
+    apps_ok = len(file_hexes.intersection(all_sheet_app_ids)) > 0 or "64cbff9e498f330001ce6412" in file_hexes
+    
+    districts_data = []
+    for r in rows:
+        row_str = " ".join([str(v) for v in r.values() if v is not None])
+        district_hexes = ID_PATTERN.findall(row_str)
+        
+        rid = district_hexes.lower().strip() if district_hexes else str(r.get('District Id', '')).strip().lower()
+        d_name = r.get('District Name', rid)
+        
+        raw_apps = str(r.get('Connected Apps', '')).strip()
+        app_list = [a.strip() for a in re.split(',|;|\|', raw_apps) if a.strip()]
+        formatted_apps = ", ".join(app_list) if app_list else "None"
+        
+        is_done = rid in ld_district_hexes if rid else False
+        districts_data.append({
+            "id": rid, 
+            "name": d_name, 
+            "segment": r.get('Segment', 'N/A'), 
+            "csm": r.get('CSM Name', 'N/A'), 
+            "apps": formatted_apps,
+            "bts": str(r.get('BTS Dates', 'TBD')).strip() or "TBD",
+            "done": is_done
+        })
+        
+    done_count = sum(1 for d in districts_data if d['done'])
+    total = len(districts_data)
+    pct = int((done_count/total)*100) if total > 0 else 0
+    warn = "" if apps_ok or total == 0 else "<div class='app-warn'>⚠️ APP GATE CLOSED</div>"
+    
+    cards_html += f"""
+    <div class="card">
+        <h2 style="color:{cfg['color']}">{cfg['title']}</h2>
+        <div class="bar"><div style="width:{pct}%;background:{cfg['color']}"></div></div>
+        <div class="stats">{pct}%</div>
+        <p><b>{done_count}</b> / {total} Districts</p>
+        {warn}
+    </div>"""
+    
+    rows_html = "".join([f"""
+        <tr>
+            <td>
+                <div class="district-info">
+                    <span class="d-name">{d['name']}</span>
+                    <span class="d-id" onclick="navigator.clipboard.writeText('{d['id']}');alert('ID Copied!');">ID: {d['id']}</span>
+                </div>
+            </td>
+            <td>{d['segment']}</td>
+            <td>{d['csm']}</td>
+            <td class="app-cell">{d['apps']}</td>
+            <td class="bts-cell">{d['bts']}</td>
+            <td class="{'ok' if d['done'] else 'no'}">{'✅ Done' if d['done'] else '⏳ Pending'}</td>
+        </tr>""" for d in sorted(districts_data, key=lambda x: x['name'])])
+    
+    dropdowns_html += f"""
+    <details>
+        <summary style="border-left: 5px solid {cfg['color']};">
+            <span>{cfg['title']} Detailed Roster</span>
+            <span class="sum-count">{done_count} / {total}</span>
+        </summary>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>District (Click ID to Copy)</th><th>Segment</th><th>CSM</th><th>Apps</th><th>BTS Date</th><th>Status</th></tr></thead>
+                <tbody>{rows_html if rows_html else '<tr><td colspan="6">No data found in sheet.</td></tr>'}</tbody>
+            </table>
+        </div>
+    </details>"""
+
+# Dynamic calculation counts based strictly on valid spreadsheet application entries
 live_prod_apps_count = sum(1 for app, states in global_apps_matrix.items() if any(states.values()))
+total_targeted_apps = len(all_sheet_app_ids) if len(all_sheet_app_ids) > 0 else 34
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
-# --- 4. HTML ASSEMBLY LOOP ---
+# --- STEP 4: HTML INTERFACE COMPONENT GENERATION ---
 apps_matrix_rows = []
 for app_id, systems in sorted(global_apps_matrix.items()):
     clean_key = app_id.lower().strip()
     display_name = app_name_map.get(clean_key, app_id)
-    
-    # Custom safety fallback for My Ada Math production ID string override
-    if not display_name and clean_key == "64cbff9e498f330001ce6412":
-        display_name = "My Ada Math"
     
     if display_name != app_id:
         display_label = f"{display_name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
@@ -216,7 +216,7 @@ for app_id, systems in sorted(global_apps_matrix.items()):
     
     apps_matrix_rows.append(f"""
         <tr>
-            <td style="text-align:left; padding:12px; border-bottom:1px solid #f1f3f4;">{display_label}</td>
+            <td style="text-align:left; padding:12px; border-bottom:1px solid #f1f3f4; font-weight:600;">{display_label}</td>
             <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{gc_status}</td>
             <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{canvas_status}</td>
             <td style="text-align:center; padding:12px; border-bottom:1px solid #f1f3f4;">{schoology_status}</td>
@@ -252,7 +252,7 @@ apps_summary_block = f"""
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
             <h2 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1.25rem; font-weight: 600;">Partner Applications Migration Status</h2>
-            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks flag readiness rules completely decoupled from live active rosters.</p>
+            <p style="margin: 0; color: #64748b; font-size: 0.875rem;">Tracks flag readiness rules completely cross-referenced against master spreadsheet indexes.</p>
         </div>
         <div style="display: flex; gap: 40px; align-items: center;">
             <div style="text-align: center;">
