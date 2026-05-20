@@ -14,11 +14,27 @@ LMS_CONFIGS = {
     "schoology": {"tab": "[Data] Schoology - Districts", "flag": "lms-connect-fully-owned-solution-schoology", "color": "#00AEEF", "title": "Schoology"}
 }
 
-# HARDCODED APP MAP: Bypasses any external file requirements cleanly
+# The true production scope mapping parameters (Excludes all test/dev IDs)
 app_name_map = {
+    "5d41ba752769fb0001ae10fa": "Khan Academy",
     "64cbff9e498f330001ce6412": "My Ada Math",
-    "65b007468aeae2000126eedd": "My Ada Math (Dev)",
-    "5ef238e4d91c0a00010fe400": "Khan Academy"
+    "68a35343a1f1a21425233bcf": "Ellipsis Education",
+    "5b2077fb03a826000165c4a1": "ClassHero",
+    "607472b92b7bf90001040d41": "Smart Science Education",
+    "66b1022e6c74dbaab2f81c82": "Blueprint (PlayVS, formerly Generation Esports)",
+    "5501ca28059de501000000bb": "BrainPOP",
+    "62b4a8cf26567400018ce321": "Progress Learning",
+    "63e410a5be04240001a20b02": "Klett World Languages",
+    "55d8f1cc71fafb0100005a90": "American Reading Company",
+    "5f972d8daa91ed0001504bc0": "Thinking Nation",
+    "681d2717cbe25ec8ad378f96": "Open Up Resources",
+    "61fd9525b853040001079c9c": "Studies Weekly",
+    "5b4640bc454d4a0001cd154c": "BrainPOP ELL",
+    "5b46407f2b1e1d000194b2c1": "BrainPOP Jr.",
+    "60076a4160534c000106935d": "BrainPOP Español",
+    "60076a803269cb000103882b": "BrainPOP Français",
+    "604fb030c8497b000106ef82": "BrainPOP Science (SSO Only)",
+    "5b4640e82b1e1d000194b2c2": "BrainPOP Suite"
 }
 
 def get_ld(flag):
@@ -49,20 +65,21 @@ except Exception as e:
 
 cards_html, dropdowns_html = "", ""
 global_apps_matrix = {}
-total_targeted_apps = 34 # Safeguarded baseline denominator count
+total_targeted_apps = len(app_name_map)
 
-# Loop over the structural configurations to pull LaunchDarkly values
+# Loop over configurations to parse specific LaunchDarkly targets
 for key, cfg in LMS_CONFIGS.items():
     ld_ids = get_ld(cfg['flag'])
     
-    # Process the active partner app matrix matches directly against the dictionary keys
     for app_id in app_name_map.keys():
-        if app_id in ld_ids or f"app:{app_id}" in ld_ids or any(app_id in str(x) for x in ld_ids):
-            if app_id not in global_apps_matrix:
-                global_apps_matrix[app_id] = {"google": False, "canvas": False, "schoology": False}
-            global_apps_matrix[app_id][key] = True
+        clean_app_id = app_id.lower().strip()
+        # Verify both variations (raw hexadecimal vs string array prefix structure)
+        if clean_app_id in ld_ids or f"app:{clean_app_id}" in ld_ids or any(clean_app_id in str(x) for x in ld_ids):
+            if clean_app_id not in global_apps_matrix:
+                global_apps_matrix[clean_app_id] = {"google": False, "canvas": False, "schoology": False}
+            global_apps_matrix[clean_app_id][key] = True
 
-# Loop over the district tabs to generate high-level metric cards and dropdown rosters
+# Loop over district spreadsheet tabs to preserve your deep roster tracking frames
 for key, cfg in LMS_CONFIGS.items():
     try:
         rows = doc.worksheet(cfg['tab']).get_all_records()
@@ -142,8 +159,11 @@ app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if to
 
 # --- 3. HTML ASSEMBLY ---
 apps_matrix_rows = []
-for app_id, name in app_name_map.items():
-    systems = global_apps_matrix.get(app_id, {"google": False, "canvas": False, "schoology": False})
+# Ensure alphabetical sort layout order based on Application descriptive text labels
+for app_id, name in sorted(app_name_map.items(), key=lambda x: x):
+    clean_key = app_id.lower().strip()
+    systems = global_apps_matrix.get(clean_key, {"google": False, "canvas": False, "schoology": False})
+    
     display_label = f"{name} <br><small style='color:#9aa0a6; font-family:monospace;'>{app_id}</small>"
     
     gc_status = '<span class="ok">✅ Active</span>' if systems['google'] else '<span class="no" style="color:#9aa0a6;">⏳ Pending</span>'
