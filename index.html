@@ -54,6 +54,56 @@
             margin-bottom: 28px;
         }
 
+        .overall-progress-block {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            border-radius: 20px;
+            max-width: 1200px;
+            margin: 0 auto 32px auto;
+            padding: 36px 32px;
+            text-align: center;
+        }
+
+        .overall-label {
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 0.85rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .overall-percent {
+            color: #0f172a;
+            font-size: 5rem;
+            line-height: 1;
+            font-weight: 900;
+            margin-bottom: 20px;
+        }
+
+        .overall-bar {
+            background: #e5e7eb;
+            height: 16px;
+            border-radius: 999px;
+            overflow: hidden;
+            max-width: 760px;
+            margin: 0 auto 16px auto;
+        }
+
+        .overall-bar div {
+            height: 100%;
+            background: #10b981;
+            border-radius: 999px;
+            transition: width 1s ease;
+        }
+
+        .overall-subtext {
+            color: #475569;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
         .container {
             display: flex;
             justify-content: center;
@@ -308,6 +358,18 @@
     <div class="sync-note">
         Run Sync opens GitHub Actions. After the workflow completes, come back here and click Refresh Dashboard.
     </div>
+
+    
+<div class="overall-progress-block">
+    <div class="overall-label">Overall Project Progress</div>
+    <div class="overall-percent">0%</div>
+    <div class="overall-bar">
+        <div style="width:0%;"></div>
+    </div>
+    <div class="overall-subtext">
+        1 of 118 total app + district transitions complete
+    </div>
+</div>
 
     
 <div class="summary-block">
@@ -1947,6 +2009,6 @@
                 </table>
             </div>
         </details>
-    <div class="ts">Last Sync: May 20, 2026 at 04:45 PM (PT)</div>
+    <div class="ts">Last Sync: May 20, 2026 at 07:56 PM (PT)</div>
 </body>
 </html>
