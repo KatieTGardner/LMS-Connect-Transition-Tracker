@@ -1,4 +1,4 @@
-import requests, datetime, sys, os, json, gspread, re
+import requests, datetime, sys, os, json, gspread, re, traceback
 from google.oauth2.service_account import Credentials
 from datetime import timezone, timedelta
 
@@ -294,7 +294,7 @@ for key, cfg in LMS_CONFIGS.items():
                 <td>
                     <div class="district-info">
                         <span class="d-name">{d['name']}</span>
-                        <span class="d-id" onclick="navigator.clipboard.writeText('{d['id']}');alert('ID Copied!');">ID: {d['id']}</span>
+                        <span class="d-id" onclick="navigator.clipboard.writeText('{d['id']}');alert('ID Copied!');">>ID: {d['id']}</span>
                     </div>
                 </td>
                 <td>{d['segment']}</td>
@@ -331,6 +331,7 @@ for key, cfg in LMS_CONFIGS.items():
 
     except Exception as e:
         print(f"Error generating UI for tab {cfg['tab']}: {e}")
+        traceback.print_exc()  # <-- added here
 
 
 deduped_live_apps = set()
