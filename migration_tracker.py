@@ -27,11 +27,6 @@ app_name_map = {
     "66b1022e6c74dbaab2f81c82": "Blueprint (PlayVS, formerly Generation Esports)",
     "5501ca28059de501000000bb": "BrainPOP",
     "62b4a8cf26567400018ce321": "Progress Learning",
-    "63e410a5be04240001a20b02": "Klett World Languages",
-    "55d8f1cc71fafb0100005a90": "American Reading Company",
-    "5f972d8daa91ed0001504bc0": "Thinking Nation",
-    "681d2717cbe25ec8ad378f96": "Open Up Resources",
-    "61fd9525b853040001079c9c": "Studies Weekly",
     "5b4640bc454d4a0001cd154c": "BrainPOP ELL",
     "5b46407f2b1e1d000194b2c1": "BrainPOP Jr.",
     "60076a4160534c000106935d": "BrainPOP Español",
@@ -40,7 +35,7 @@ app_name_map = {
     "5b4640e82b1e1d000194b2c2": "BrainPOP Suite",
 }
 
-total_targeted_apps = 18
+total_targeted_apps = 13
 
 
 def clean_id_string(raw_str):
