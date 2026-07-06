@@ -428,21 +428,21 @@ apps_summary_block = f"""
 <div class="summary-block">
     <div class="summary-flex">
         <div>
-            <h2>App Feature Flags Overview</h2>
-            <p>Tracks total active application feature flags currently configured across platforms.</p>
+            <h2>App Migration Status</h2>
+            <p>Tracks apps fully migrated across all three LMS platforms (Google Classroom, Canvas, Schoology).</p>
         </div>
         <div class="summary-metrics">
             <div class="metric">
                 <span class="metric-value green">{live_prod_apps_count}</span>
-                <span class="metric-label">Flags Active</span>
+                <span class="metric-label">Fully Migrated</span>
             </div>
             <div class="divider"></div>
             <div class="metric">
                 <span class="metric-value gray">{total_targeted_apps}</span>
-                <span class="metric-label">Total Scope</span>
+                <span class="metric-label">Total Apps</span>
             </div>
             <div class="divider"></div>
-            <div class="pill">{app_progress_pct}% Configured</div>
+            <div class="pill">{app_progress_pct}% Migrated</div>
         </div>
     </div>
 </div>
