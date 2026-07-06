@@ -332,12 +332,13 @@ for key, cfg in LMS_CONFIGS.items():
 deduped_live_apps = set()
 
 for app_id, states in global_apps_matrix.items():
-    if any(states.values()):
+    if all(states.values()):
         name_match = app_name_map.get(app_id)
         if name_match:
             deduped_live_apps.add(name_match)
 
 live_prod_apps_count = len(deduped_live_apps)
+total_targeted_apps = len(set(app_name_map.values()))
 app_progress_pct = int((live_prod_apps_count / total_targeted_apps) * 100) if total_targeted_apps > 0 else 0
 
 overall_done = live_prod_apps_count + total_done_districts
